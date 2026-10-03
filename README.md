@@ -25,10 +25,14 @@ export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
 export CARGO_PROFILE_RELEASE_OPT_LEVEL=2
 export CARGO_PROFILE_RELEASE_STRIP=debuginfo
 cargo build --release -p codex-cli --bin codex
+# Перед сборкой Windows запустите scripts/prepare-windows-migrations.py
+# из этого репозитория с --codex-rs /path/to/codex-0.159.2/codex-rs.
 cargo xwin build --release --locked -p codex-cli --bin codex --target x86_64-pc-windows-msvc
 ```
 
 Полученные файлы: `target/release/codex` для Ubuntu и `target/x86_64-pc-windows-msvc/release/codex.exe` для Windows. Для полного рабочего комплекта скопируйте рядом с ними служебные файлы официального пакета соответствующей версии. `scripts/fetch-vendor.py --platform windows` и `--platform linux` загружают официальные npm-пакеты 0.159.2 и проверяют SHA-512. Директория загрузки `build/` исключена из Git.
+
+**Windows и SQLite:** Windows-пакет Codex был собран с CRLF в SQL-миграциях; у исходников, полученных через Git в Ubuntu, обычно LF. SQLx вычисляет контрольные суммы по точным байтам SQL. Поэтому сборка Windows из LF-исходников отвергает уже существующую Windows-базу SQLite, хотя сама база цела. После сборки Linux выполните `python scripts/prepare-windows-migrations.py --codex-rs /path/to/codex-0.159.2/codex-rs --mode crlf` и только затем соберите Windows. Для повторной сборки Linux верните `--mode lf`. Скрипт меняет окончания строк только в шести каталогах миграций и заставляет Cargo пересобрать включающий их модуль. Пользовательские базы SQLite изменять не требуется.
 
 Установка выполняется отдельно в каждой ОС командой `python scripts/install.py --binary ПУТЬ_К_ФАЙЛУ --vendor-root ПУТЬ_К_VENDOR --patch patches/codex-0.159.2-reasoning-accounting.patch --preload bootstrap/preload.cjs`. Установщик создаёт отдельную версию в `~/.codex/context-accounting-fix/`, проверяет хеш исполняемого файла и формирует одинаковую для обеих ОС опцию запуска. Существующие файлы официального Codex он не заменяет.
 
