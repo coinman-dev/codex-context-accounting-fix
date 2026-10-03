@@ -1,0 +1,15 @@
+/build/
+/target/
+/node_modules/
+/__pycache__/
+*.pyc
+*.log
+*.tmp
+*.bak
+*.tgz
+*.zip
+*.exe
+auth.json
+models_cache.json
+catalog.json
+config.toml
