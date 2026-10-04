@@ -96,7 +96,27 @@ The script checks the version and the checksums, keeps the previous file in the 
 
 ## Context window size
 
-The 1,050,000-token window that OpenAI lists for the GPT-6 and GPT-5.6 models is split between input and output: the [model documentation](https://developers.openai.com/api/docs/models/gpt-6.1-sol) gives a maximum input of 922,000 tokens and a maximum output of 128,000. The history of a Codex chat is entirely input, so its ceiling is 922,000, not 1,050,000. The Codex server catalog allows the client even less: `max_context_window = 872000` with `effective_context_window_percent = 95`, and `model_context_window` cannot be raised above that maximum.
+The accounting fix does not change the window and works with the default settings. A larger window is a separate, optional choice.
+
+The 1,050,000-token window that OpenAI lists for the GPT-6 and GPT-5.6 models is split between input and output: the [model documentation](https://developers.openai.com/api/docs/models/gpt-6.1-sol) gives a maximum input of 922,000 tokens and a maximum output of 128,000. The history of a Codex chat is entirely input, so its ceiling is 922,000, not 1,050,000.
+
+### Within the server catalog
+
+The Codex server catalog gives these models `max_context_window = 872000` with `effective_context_window_percent = 95`, and `model_context_window` cannot be raised above that maximum. Reaching it needs no custom catalog, only these settings in `~/.codex/config.toml`:
+
+```toml
+model_context_window = 872000
+model_auto_compact_token_limit = 872000
+model_auto_compact_token_limit_scope = "body_after_prefix"
+model_post_turn_compact_threshold_percent = 0
+```
+
+Compact then starts at 828,400 tokens (95% of 872,000), which leaves 93,600 tokens below the input ceiling.
+
+### Beyond the server catalog
+
+> [!CAUTION]
+> This setup goes past what the server catalog allows and is not supported by OpenAI. The Codex team [recommends the default window settings](https://github.com/openai/codex/issues/19409#issuecomment-4315638228) and has [warned](https://github.com/openai/codex/issues/19464#issuecomment-4364763432) that client-side overrides can leave a chat that cannot be compacted. That is what happened in the test described below. Use it only if you accept that risk.
 
 To use the whole documented input, create a local catalog:
 
@@ -106,7 +126,7 @@ python scripts/create-catalog.py
 
 The script copies the model list from `~/.codex/models_cache.json` and changes two fields for seven GPT-6 and GPT-5.6 models: `max_context_window` becomes 922,000 and `effective_context_window_percent` becomes 97. Other models are left as they are. The catalog is not stored in Git because it depends on the client version and on what the account can access; create it again when new models appear.
 
-Settings in `~/.codex/config.toml`:
+Point the settings at the catalog and raise both values:
 
 ```toml
 model_catalog_json = "/home/USER/.codex/codex-1m/catalog.json"
@@ -116,7 +136,7 @@ model_auto_compact_token_limit_scope = "body_after_prefix"
 model_post_turn_compact_threshold_percent = 0
 ```
 
-With these settings compact starts at 894,340 tokens (97% of 922,000), and the same value is the denominator of the context indicator in Zed. The catalog path must be absolute; on Windows it has the form `C:/Users/USER/.codex/codex-1m/catalog.json`. The share is set by the `EFFECTIVE_PERCENT` constant in the script; after changing it, create the catalog again in each OS.
+Compact then starts at 894,340 tokens (97% of 922,000), and the same value is the denominator of the context indicator in Zed. The catalog path must be absolute; on Windows it has the form `C:/Users/USER/.codex/codex-1m/catalog.json`. The share is set by the `EFFECTIVE_PERCENT` constant in the script; after changing it, create the catalog again in each OS.
 
 ### Why the threshold stays below the limit
 
