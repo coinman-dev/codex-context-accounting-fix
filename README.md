@@ -45,6 +45,8 @@ git apply /path/to/codex-context-accounting-fix/patches/codex-0.159.2-reasoning-
 cd codex-rs
 ```
 
+The patch also applies unchanged to tag `rust-v0.160.0`.
+
 Use Rust 1.98.1, `just` and `cargo-nextest`. A Windows build also needs the `x86_64-pc-windows-msvc` target, `cargo-xwin`, Clang/LLD and CMake. The first Cargo run updates the local package versions in the `Cargo.lock` of the source tag; the dependencies stay pinned. The profile used for validation:
 
 ```bash
@@ -149,8 +151,19 @@ The client checks the threshold between model steps, and one step adds reasoning
 
 ## Validation status
 
-- 7 integration checks of the context calculation pass, including session restore and both threshold modes.
-- 5 tests pass in the module that needed a raised compiler recursion limit.
+- 7 integration checks of the context calculation pass on 0.159.2 and on 0.160.0, including session restore and both threshold modes.
+- On unpatched 0.160.0 sources the four new cases fail: Codex sends the compact request that the patch prevents.
+- 5 tests pass on both versions in the module that needed a raised compiler recursion limit.
 - The full test suite of the source tree was not run.
-- In a working chat after installation the context reached 922,856 input tokens without premature compact; before the fix the same chat was compacted at 734,065.
-- Compact at the 894,340 threshold has not yet been observed in a working chat.
+- A binary was built and installed only from 0.159.2. In a working chat after installation the context reached 922,856 input tokens without premature compact; before the fix the same chat was compacted at 734,065.
+- Compact at the configured threshold has not yet been observed in a working chat.
+
+To repeat the checks, run in `codex-rs` of the patched sources:
+
+```bash
+export RUST_MIN_STACK=8388608
+cargo test -p codex-core --test all -- all_turns_reasoning_without_header_does_not_compact_twice auto_compact_accounts_for_encrypted_reasoning auto_compact_body_after_prefix_still_caps_at_context_window
+cargo test -p codex-chatgpt
+```
+
+The stack size is the one the project's own test recipe sets; without it the unoptimized test binary overflows its stack.
