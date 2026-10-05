@@ -126,7 +126,7 @@ To use the whole documented input, create a local catalog:
 python scripts/create-catalog.py
 ```
 
-The script copies the model list from `~/.codex/models_cache.json` and changes two fields for seven GPT-6 and GPT-5.6 models: `max_context_window` becomes 922,000 and `effective_context_window_percent` becomes 97. Other models are left as they are. The catalog is not stored in Git because it depends on the client version and on what the account can access; create it again when new models appear.
+The script copies the model list from `~/.codex/models_cache.json` and sets two fields for seven GPT-6 and GPT-5.6 models: `max_context_window` becomes 922,000, and `effective_context_window_percent` is set to 95, the share the server catalog already uses. Other models are left as they are. The catalog is not stored in Git because it depends on the client version and on what the account can access; create it again when new models appear.
 
 Point the settings at the catalog and raise both values:
 
@@ -138,16 +138,16 @@ model_auto_compact_token_limit_scope = "body_after_prefix"
 model_post_turn_compact_threshold_percent = 0
 ```
 
-Compact then starts at 894,340 tokens (97% of 922,000), and the same value is the denominator of the context indicator in Zed. The catalog path must be absolute; on Windows it has the form `C:/Users/USER/.codex/codex-1m/catalog.json`. The share is set by the `EFFECTIVE_PERCENT` constant in the script; after changing it, create the catalog again in each OS.
+Compact then starts at 875,900 tokens (95% of 922,000), and the same value is the denominator of the context indicator in Zed. The catalog path must be absolute; on Windows it has the form `C:/Users/USER/.codex/codex-1m/catalog.json`. The share is set by the `EFFECTIVE_PERCENT` constant in the script; after changing it, create the catalog again in each OS.
 
 ### Why the threshold stays below the limit
 
 > [!WARNING]
-> Do not remove the margin of 27,660 tokens between the threshold and the limit. Once the server rejects a request for its size, Codex 0.159.2 does not compact the history on its own, and the chat stays unusable.
+> Do not remove the margin of 46,100 tokens between the threshold and the limit. Once the server rejects a request for its size, Codex 0.159.2 does not compact the history on its own, and the chat stays unusable.
 
 A configuration with a 1,050,000 window and a 100% share was tried in a working GPT-6.1 Sol chat. The server accepted a request with 922,856 input tokens and rejected the next one, about 925,000 tokens, with `context_length_exceeded`. The client believed the limit was 1,050,000 and did not start compact. After such a rejection Codex 0.159.2 ends the turn with the error "Codex ran out of room in the model's context window". A compact request sends the same history and hits the same limit, so the chat remains unusable.
 
-The client checks the threshold between model steps, and one step adds reasoning and command output to the history. In the saved chats 99% of steps added no more than 11,252 tokens, five steps out of 7,326 added more than the current margin, and the largest added 51,897. A step of that size close to the threshold stops the chat again, so the 97% share accepts this risk deliberately. The server's 95% share gives a threshold of 875,900 and a margin of 46,100.
+The client checks the threshold between model steps, and one step adds reasoning and command output to the history. In the saved chats 99% of steps added no more than 11,292 tokens, and two steps out of 7,647 added more than the 46,100 margin: 51,897 and 90,254. The largest came from a single response that reasoned for 54 minutes before it was interrupted; its unfinished reasoning stayed in the history. A step of that size close to the threshold stops the chat again. A higher share makes this more likely: at 97% the margin is 27,660, and six steps exceeded it.
 
 ## Validation status
 

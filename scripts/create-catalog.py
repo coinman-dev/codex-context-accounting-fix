@@ -11,7 +11,8 @@ from pathlib import Path
 MAX_INPUT_TOKENS = 922_000
 # Compact starts at this share of the input ceiling. The rest must cover one
 # model step, because the compact request itself sends the whole history.
-EFFECTIVE_PERCENT = 97
+# 95 is also the share the server catalog uses.
+EFFECTIVE_PERCENT = 95
 SUPPORTED = {
     "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
