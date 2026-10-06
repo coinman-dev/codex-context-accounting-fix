@@ -43,6 +43,7 @@ function Get-Sha256([string]$File) {
 }
 function Quote-ProcessArgument([string]$Value) {
     # CommandLineToArgvW quoting, including trailing backslashes in quoted paths.
+    if ($Value -and $Value -notmatch '[\s"]') { return $Value }
     return '"' + ([regex]::Replace([regex]::Replace($Value, '(\\*)"', '$1$1\"'), '(\\+)$', '$1$1')) + '"'
 }
 function Invoke-Captured([string]$Executable, [string[]]$Arguments, [string]$InputText = '') {
@@ -239,7 +240,7 @@ if ($Rollback) {
         else { Write-Warning 'User PATH changed after installation; its current value was preserved.' }
         $env:Path = ($env:Path -split ';' | Where-Object { $_.TrimEnd('\') -ne (Join-Path $root 'bin').TrimEnd('\') }) -join ';'
     }
-    if ($state.previousState) { [System.IO.File]::WriteAllText($statePath, $state.previousState, $utf8) }
+    if ($state.previousStateFile) { [System.IO.File]::WriteAllText($statePath, [System.IO.File]::ReadAllText($state.previousStateFile), $utf8) }
     else { Remove-Item -LiteralPath $statePath }
     Write-Host 'Rollback completed. Reload the Codex agent in Zed and open a new terminal.'
     return
@@ -290,7 +291,7 @@ $preparedWsl = @()
 $previousState = $null
 if (Test-Path -LiteralPath $statePath) { $previousState = [System.IO.File]::ReadAllText($statePath) }
 $pathBefore = [Environment]::GetEnvironmentVariable('Path', 'User')
-$state = [ordered]@{transactionId=$transactionId; release=$Release; windows=$false; wsl=@(); pathBefore=$pathBefore; pathAfter=$pathBefore; pathChanged=$false; previousState=$previousState; state='preparing'}
+$state = [ordered]@{transactionId=$transactionId; release=$Release; windows=$false; wsl=@(); pathBefore=$pathBefore; pathAfter=$pathBefore; pathChanged=$false; previousStateFile=$null; state='preparing'}
 try {
     if (-not $WslOnly) {
         $package = Join-Path $cache ('package-windows-' + $transactionId)
@@ -308,6 +309,11 @@ try {
         Write-Host "Prepared WSL2 $name : $($result.version)"
     }
     $state.state = 'prepared'
+    if ($previousState) {
+        $state.previousStateFile = Join-Path $root ('powershell-transactions\' + $transactionId + '\previous.json')
+        [System.IO.Directory]::CreateDirectory((Split-Path -Parent $state.previousStateFile)) | Out-Null
+        [System.IO.File]::WriteAllText($state.previousStateFile, $previousState, $utf8)
+    }
     Write-JsonFile $statePath $state
     if ($preparedWindows) {
         $result = Invoke-WindowsAction $node $helper @{operation='commit'; transactionId=$transactionId}

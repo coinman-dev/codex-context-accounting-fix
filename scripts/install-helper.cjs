@@ -249,6 +249,7 @@ async function protocolProbe(binary, adapter, cwd) {
     }
     const timer = setTimeout(() => finish(new Error('Startup probe timed out: ' + stderr)), 30000);
     child.on('error', finish);
+    child.stdin.on('error', finish);
     child.on('close', code => { if (!settled) finish(new Error('Startup process exited (' + code + '): ' + stderr)); });
     child.stderr.on('data', data => {
       stderr = (stderr + data).slice(-6000);
@@ -258,6 +259,7 @@ async function protocolProbe(binary, adapter, cwd) {
     });
     function send(id, method, params) { child.stdin.write(JSON.stringify({jsonrpc: '2.0', ...(id === null ? {} : {id}), method, params}) + '\n'); }
     child.stdout.on('data', data => {
+      if (settled) return;
       pending += data;
       const lines = pending.split('\n'); pending = lines.pop();
       for (const line of lines) {
