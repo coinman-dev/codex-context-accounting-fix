@@ -41,6 +41,21 @@ function Get-Sha256([string]$File) {
     try { return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
     finally { $stream.Dispose(); $algorithm.Dispose() }
 }
+function Notify-EnvironmentChange {
+    if (-not ('CodexContextAccountingEnvironment' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class CodexContextAccountingEnvironment {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr wparam,
+        string lparam, uint flags, uint timeout, out UIntPtr result);
+}
+'@
+    }
+    $noticeResult = [UIntPtr]::Zero
+    [void][CodexContextAccountingEnvironment]::SendMessageTimeout([IntPtr]0xffff, 0x1a, [UIntPtr]::Zero, 'Environment', 2, 1000, [ref]$noticeResult)
+}
 function Quote-ProcessArgument([string]$Value) {
     # CommandLineToArgvW quoting, including trailing backslashes in quoted paths.
     if ($Value -and $Value -notmatch '[\s"]') { return $Value }
@@ -236,7 +251,7 @@ if ($Rollback) {
     }
     if ($state.pathChanged) {
         $current = [Environment]::GetEnvironmentVariable('Path', 'User')
-        if ($current -eq $state.pathAfter) { [Environment]::SetEnvironmentVariable('Path', $state.pathBefore, 'User') }
+        if ($current -eq $state.pathAfter) { [Environment]::SetEnvironmentVariable('Path', $state.pathBefore, 'User'); Notify-EnvironmentChange }
         else { Write-Warning 'User PATH changed after installation; its current value was preserved.' }
         $env:Path = ($env:Path -split ';' | Where-Object { $_.TrimEnd('\') -ne (Join-Path $root 'bin').TrimEnd('\') }) -join ';'
     }
@@ -331,6 +346,7 @@ try {
             $state.pathChanged = $true
             Write-JsonFile $statePath $state
             [Environment]::SetEnvironmentVariable('Path', $state.pathAfter, 'User')
+            Notify-EnvironmentChange
         }
         $env:Path = $bin + ';' + $env:Path
     }
@@ -347,7 +363,7 @@ try {
         try { Invoke-WindowsAction $node $helper @{operation='rollback'; transactionId=$transactionId} | Out-Null }
         catch { Write-Warning "Windows rollback needs attention: $_" }
     }
-    if ($state.pathChanged) { [Environment]::SetEnvironmentVariable('Path', $pathBefore, 'User') }
+    if ($state.pathChanged) { [Environment]::SetEnvironmentVariable('Path', $pathBefore, 'User'); Notify-EnvironmentChange }
     if ($previousState) { [System.IO.File]::WriteAllText($statePath, $previousState, $utf8) }
     elseif (Test-Path -LiteralPath $statePath) { Remove-Item -LiteralPath $statePath }
     throw $failure
