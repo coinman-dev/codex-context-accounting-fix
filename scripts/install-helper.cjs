@@ -239,13 +239,18 @@ async function protocolProbe(binary, adapter, cwd) {
     else delete env.NODE_OPTIONS;
     const child = spawn(adapter ? process.execPath : binary, adapter ? [adapter] : ['app-server'], {cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe']});
     let stderr = '', pending = '', selected = !adapter, settled = false;
-    function finish(error) {
+    function finish(error, status = 'passed') {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      child.stdin.end();
-      child.kill();
-      if (error) reject(error); else resolve();
+      const done = () => { if (error) reject(error); else resolve(status); };
+      // The next probe opens the same SQLite profile. Wait for the previous
+      // process to exit and release its handles before starting the adapter.
+      if (child.pid && child.exitCode === null && child.signalCode === null) {
+        child.once('close', done);
+        child.stdin.end();
+        child.kill();
+      } else done();
     }
     const timer = setTimeout(() => finish(new Error('Startup probe timed out: ' + stderr)), 30000);
     child.on('error', finish);
@@ -265,7 +270,12 @@ async function protocolProbe(binary, adapter, cwd) {
       for (const line of lines) {
         let event; try { event = JSON.parse(line); } catch { continue; }
         if (event.id !== 1 && event.id !== 2) continue;
-        if (event.error) { finish(new Error(JSON.stringify(event.error))); return; }
+        if (event.error) {
+          if (adapter && event.id === 2 && selected && event.error.code === -32000 && /Authentication required/i.test(event.error.message || '')) {
+            finish(null, 'authentication-required');
+          } else finish(new Error(JSON.stringify(event.error) + '\n' + stderr));
+          return;
+        }
         if (event.id === 1) {
           if (adapter) send(2, 'session/new', {cwd, mcpServers: []});
           else { send(null, 'initialized', {}); send(2, 'thread/start', {cwd, persistExtendedHistory: false}); }
@@ -286,9 +296,9 @@ async function probe(save = true) {
   await protocolProbe(binary, null, cwd);
   const zed = WINDOWS ? path.join(process.env.LOCALAPPDATA, 'Zed') : path.join(os.homedir(), '.local/share/zed');
   const adapter = path.join(zed, 'external_agents/registry/npx/codex-acp/node_modules/@agentclientprotocol/codex-acp/dist/index.js');
-  if (fs.existsSync(adapter)) await protocolProbe(binary, adapter, cwd);
+  const acp = fs.existsSync(adapter) ? await protocolProbe(binary, adapter, cwd) : 'not-installed';
   const result = {version: VERSION, selected_binary: binary, app_server: 'passed',
-    acp: fs.existsSync(adapter) ? 'passed' : 'not-installed', inference_requests: 0};
+    acp, inference_requests: 0};
   if (save) atomic(path.join(root, 'startup-validation.json'), json(result));
   return result;
 }

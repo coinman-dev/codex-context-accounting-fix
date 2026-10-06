@@ -333,10 +333,12 @@ try {
     if ($preparedWindows) {
         $result = Invoke-WindowsAction $node $helper @{operation='commit'; transactionId=$transactionId}
         Write-Host "Windows startup checks passed (ACP: $($result.validation.acp))."
+        if ($result.validation.acp -eq 'authentication-required') { Write-Host 'Sign in to Codex in Zed to start a chat.' }
     }
     foreach ($name in $preparedWsl) {
         $result = Invoke-WslAction $name @{operation='commit'; transactionId=$transactionId; release=$Release}
         Write-Host "WSL2 $name startup checks passed (ACP: $($result.validation.acp))."
+        if ($result.validation.acp -eq 'authentication-required') { Write-Host "Sign in to Codex for WSL2 $name to start a chat." }
     }
     if ($preparedWindows -and -not $SkipCli) {
         $bin = Join-Path $root 'bin'

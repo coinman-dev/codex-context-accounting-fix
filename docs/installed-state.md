@@ -33,3 +33,15 @@ Checks: 7 integration tests of the context accounting, 5 `codex-chatgpt` tests, 
 On 5 October the patch was validated on the Codex 0.160.0 sources (commit `a956835d020762cb2b570053af06f643a11c0ecc`): it applies unchanged, the 7 integration checks and the 5 `codex-chatgpt` tests pass, and without the two source changes the four new cases fail with an extra compact request. No binaries were built or installed from 0.160.0.
 
 To reinstall, use the scripts and the instructions in the README. After the files are updated, an agent that is already connected is switched through the chat panel menu `⋯ → Reload Agent` once the current work has finished. The installation does not depend on temporary source or build directories.
+
+## Prerelease validation, 6 October 2026
+
+The `v0.160.0-reasoning.1` archives were built locally in WSL2 from upstream commit `a956835d020762cb2b570053af06f643a11c0ecc`, using the same accounting patch. Windows was cross-compiled with `cargo-xwin` after normalizing all 73 SQL migrations to CRLF. Linux was built inside a private Ubuntu 22.04 environment; `readelf` confirms its highest glibc requirement is `GLIBC_2.35`.
+
+Seven accounting integration cases passed, plus five `codex-chatgpt` unit tests and two integration tests. These were run in the ordinary debug test profile: upstream's release-mode temp-directory guard rejects the temporary `CODEX_HOME` created by its test initializer. The unsuccessful GitHub run failed at that initializer after its Linux CLI had compiled; the release binaries published here came from the subsequent local builds.
+
+Both actual release archives passed app-server startup, the stock ACP adapter's `initialize` and `session/new` on the existing signed-in profiles, and model-catalog loading. These checks sent no inference requests. Installation, verification and rollback of the release archives were also exercised in isolated Windows/WSL profiles, including a Windows home path containing spaces. An unauthenticated profile correctly reports that sign-in is required, rather than treating this as a broken installation.
+
+The PowerShell 5.1 coordinator passed installation, repeat installation, two successive rollbacks, checksum rejection, and automatic restoration of Windows after a WSL startup failure. The Node installer tests passed on both platforms, covering JSONC settings, CLI selection, preservation of manual edits, rollback and corrupt packages. Startup checks wait for each Codex process to exit before reopening SQLite, avoiding a race between the direct app-server probe and ACP.
+
+`release.json` and `SHA256SUMS` contain the binary/archive hashes and the upstream/patch identity. The signed-in working installations recorded above remain on 0.159.2 until the user runs the new installer; the release verification did not switch their active binaries or Zed settings. A full upstream test suite and a real-model compaction at the threshold were not run for this prerelease.

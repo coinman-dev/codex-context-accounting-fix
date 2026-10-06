@@ -50,16 +50,16 @@ printf '%s' "$test_home"
     try:
         run('-Distro', args.wsl_distro, '-SkipCli', '-AssetDirectory', str(args.assets.resolve()))
         proof = json.loads((home / '.codex/context-accounting-fix/startup-validation.json').read_text())
-        assert proof['app_server'] == 'passed' and proof['acp'] == 'passed'
+        assert proof['app_server'] == 'passed' and proof['acp'] in ('passed', 'authentication-required')
         command = 'cat ' + remote + '/.codex/context-accounting-fix/startup-validation.json\n'
         remote_proof = json.loads(subprocess.run(['wsl.exe', '-d', args.wsl_distro, '--', 'bash', '-s'], input=command.encode(), capture_output=True, check=True).stdout)
-        assert remote_proof['app_server'] == 'passed' and remote_proof['acp'] == 'passed'
+        assert remote_proof['app_server'] == 'passed' and remote_proof['acp'] in ('passed', 'authentication-required')
         (fixture / 'proof.json').write_text(json.dumps({'windows': proof, 'wsl': remote_proof}, indent=2))
         run('-Distro', args.wsl_distro, '-Check')
     finally:
         if (home / '.codex/context-accounting-fix/last-powershell-install.json').exists():
             run('-Rollback')
-    print('Release archives: Windows and WSL app-server + stock ACP startup passed; no inference requests.')
+    print('Release archives: Windows and WSL app-server + stock ACP startup verified; unauthenticated profiles report sign-in required; no inference requests.')
 
 
 if __name__ == '__main__':

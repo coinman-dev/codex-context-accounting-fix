@@ -23,6 +23,8 @@ Run as your regular Windows user. Administrator rights, Python for Windows and a
 
 The script downloads the matching release archives, verifies SHA-256 for the archives and their contents, stages both installations, and then switches the stock Zed `codex-acp` agent to the patched files. It discovers WSL2 distros with an existing Codex profile and skips Docker's service distros. It installs under `~/.codex/context-accounting-fix/`, adds a `codex` launcher to the user PATH, backs up affected files, and checks app-server startup and ACP startup where the adapter is installed. The checks create empty threads and send no model prompts. A startup failure triggers rollback of the prepared installations.
 
+If you have not signed in to Codex yet, the installer verifies startup and reports that authentication is required. Sign in through Zed before starting a chat. Each startup probe waits for the previous process to exit before opening the same SQLite profile again.
+
 Existing context-window settings are preserved; increasing the window is a separate choice. After installation choose **⋯ → Reload Agent** in Zed when current work finishes. Open a new terminal to use the patched `codex`. An explicit executable path, shell alias/function, or a system PATH entry taking priority can still select another Codex; `Get-Command codex -All` / `type -a codex` shows which command your shell selects.
 
 ```powershell
@@ -36,7 +38,7 @@ Existing context-window settings are preserved; increasing the window is a separ
 
 Rollback restores the previous files, including an earlier local fix. It stops if an affected file was edited after installation, so your edits are preserved. Existing official executables remain available at their original paths. Backups and transaction records are under `~/.codex/context-accounting-fix/transactions/` in each OS. For offline installation, download `release.json`, `install-helper.cjs`, `preload.cjs`, and the required platform ZIPs from the same release into one folder, then pass `-AssetDirectory C:\path\to\folder`.
 
-The archives include the platform resources from the official 0.160.0 npm packages, verified against npm SHA-512, plus the patched CLI and its source patch. Windows SQL migrations are normalized to CRLF to match the official Windows database checksums. Linux is built on Ubuntu 22.04. The build workflow pins upstream commit `a956835d020762cb2b570053af06f643a11c0ecc` and verifies upstream V8 assets against the checked-in manifests.
+The archives include the platform resources from the official 0.160.0 npm packages, verified against npm SHA-512, plus the patched CLI and its source patch. Windows SQL migrations are normalized to CRLF to match the official Windows database checksums. Both prerelease binaries were built locally in WSL2: Windows through `cargo-xwin`, Linux inside an Ubuntu 22.04 build environment. The Linux binary's highest glibc requirement is `GLIBC_2.35`. The build scripts pin upstream commit `a956835d020762cb2b570053af06f643a11c0ecc` and verify upstream V8 assets against the checked-in manifests.
 
 ## Why compact started too early
 
@@ -188,7 +190,8 @@ The client checks the threshold between model steps, and one step adds reasoning
 - On unpatched 0.160.0 sources the four new cases fail: Codex sends the compact request that the patch prevents.
 - 5 tests pass on both versions in the module that needed a raised compiler recursion limit.
 - The full test suite of the source tree was not run.
-- A binary was built and installed only from 0.159.2. In a working chat after installation the context reached 922,856 input tokens without premature compact; before the fix the same chat was compacted at 734,065.
+- The 0.160.0 prerelease binaries were built in WSL2 and passed app-server and stock ACP startup checks on Windows and WSL2, including the existing signed-in profiles, without inference requests. The installer and rollback were also checked in isolated profiles.
+- The live-chat measurement remains from 0.159.2: after installation the context reached 922,856 input tokens without premature compact; before the fix the same chat was compacted at 734,065.
 - Compact at the configured threshold has not yet been observed in a working chat.
 
 To repeat the checks, run in `codex-rs` of the patched sources:
