@@ -1,0 +1,82 @@
+name: Build patched Codex 0.160.0
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            target: x86_64-unknown-linux-gnu
+            binary: codex
+          - os: windows-2022
+            platform: windows
+            target: x86_64-pc-windows-msvc
+            binary: codex.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    env:
+      RUSTUP_TOOLCHAIN: 1.98.1
+      CARGO_PROFILE_RELEASE_LTO: 'false'
+      CARGO_PROFILE_RELEASE_DEBUG: '0'
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: '2'
+      CARGO_PROFILE_RELEASE_STRIP: debuginfo
+      CARGO_BUILD_JOBS: '2'
+      RUST_MIN_STACK: '8388608'
+      LIBSQLITE3_FLAGS: SQLITE_DISABLE_INTRINSIC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: openai/codex
+          ref: a956835d020762cb2b570053af06f643a11c0ecc
+          path: build/upstream
+      - name: Apply accounting fix
+        shell: bash
+        run: git -C build/upstream apply ../../patches/codex-0.159.2-reasoning-accounting.patch
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake clang lld pkg-config libssl-dev libcap-dev
+      - name: Match official Windows migration checksums
+        if: runner.os == 'Windows'
+        run: python scripts/prepare-windows-migrations.py --codex-rs build/upstream/codex-rs --mode crlf
+      - name: Install Rust
+        shell: bash
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Fetch verified official resources and V8
+        shell: bash
+        run: |
+          python scripts/fetch-vendor.py --version 0.160.0 --platform ${{ matrix.platform }}
+          python scripts/prepare-v8.py --source build/upstream --target ${{ matrix.target }}
+      - name: Match bundled Linux sandbox digest
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          resource=build/vendor-0.160.0-linux/package/vendor/x86_64-unknown-linux-musl/codex-resources/bwrap
+          test -f "$resource"
+          echo "CODEX_BWRAP_SHA256=$(sha256sum "$resource" | cut -d ' ' -f1)" >> "$GITHUB_ENV"
+      - name: Build CLI
+        working-directory: build/upstream/codex-rs
+        shell: bash
+        run: cargo build --release -p codex-cli --bin codex
+      - name: Verify accounting regression tests
+        if: runner.os == 'Linux'
+        working-directory: build/upstream/codex-rs
+        shell: bash
+        run: |
+          cargo test --release --locked -p codex-core --test all -- all_turns_reasoning_without_header_does_not_compact_twice auto_compact_accounts_for_encrypted_reasoning auto_compact_body_after_prefix_still_caps_at_context_window
+          cargo test --release --locked -p codex-chatgpt
+      - name: Package verified binaries
+        shell: bash
+        run: python scripts/package-release.py --platform ${{ matrix.platform }} --binary build/upstream/codex-rs/target/release/${{ matrix.binary }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-0.160.0-${{ matrix.platform }}-x64
+          path: build/dist/*
+          compression-level: 0
+          if-no-files-found: error
