@@ -15,11 +15,14 @@
 Скачайте и запустите установщик из [v0.160.0-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.160.0-reasoning.1):
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.160.0-reasoning.1/install.ps1 -OutFile .\install-codex-fix.ps1
-powershell -ExecutionPolicy Bypass -File .\install-codex-fix.ps1
+$installerPath = Join-Path $env:USERPROFILE 'install-codex-fix.ps1'
+Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.160.0-reasoning.1/install.ps1 -OutFile $installerPath
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath
 ```
 
 Запускайте от обычного пользователя Windows. Права администратора, Python в Windows и инструменты сборки Rust не нужны. Для Windows требуются x64, PowerShell 5.1+ и Node.js 20+; установщик умеет использовать Node.js из Zed. Для WSL2 требуются x86_64, Python 3, Node.js 20+, glibc 2.35+, OpenSSL 3 и libcap — подходит Ubuntu 22.04 и новее. Если Node.js не найден, один раз запустите агент Codex в Zed или установите Node.js в нужной ОС.
+
+Команды сохраняют скрипт в пользовательскую папку и работают даже при запуске PowerShell из `C:\Windows\system32`.
 
 Скрипт скачивает архивы нужных платформ, проверяет SHA-256 архивов и их содержимого, подготавливает обе установки и подключает исправленные файлы к штатному агенту Zed `codex-acp`. Он находит дистрибутивы WSL2 с существующим профилем Codex и пропускает служебные дистрибутивы Docker. Файлы устанавливаются в `~/.codex/context-accounting-fix/`; команда `codex` добавляется в пользовательский PATH. Скрипт сохраняет резервные копии и проверяет запуск app-server, а при наличии адаптера — ACP. Проверки создают пустые чаты и не отправляют запросов модели. Если проверка запуска не проходит, подготовленные установки откатываются.
 
@@ -28,12 +31,12 @@ powershell -ExecutionPolicy Bypass -File .\install-codex-fix.ps1
 Настройки размера контекста сохраняются; увеличение окна — отдельный выбор. После установки выберите **⋯ → Reload Agent** в Zed, когда текущая работа завершится. Для команды `codex` откройте новый терминал. Явный путь к программе, alias или функция оболочки, а также более приоритетный системный PATH могут выбирать другой Codex; выбор можно проверить через `Get-Command codex -All` / `type -a codex`.
 
 ```powershell
-.\install-codex-fix.ps1 -WindowsOnly           # Только Windows
-.\install-codex-fix.ps1 -WslOnly -Distro Ubuntu # Один дистрибутив WSL2
-.\install-codex-fix.ps1 -SkipCli               # Подключить только Zed
-.\install-codex-fix.ps1 -SkipZed               # Установить только команду терминала
-.\install-codex-fix.ps1 -Check                 # Проверить установленную сборку
-.\install-codex-fix.ps1 -Rollback              # Вернуть предыдущую установку
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -WindowsOnly
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -WslOnly -Distro Ubuntu
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -SkipCli
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -SkipZed
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -Check
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -Rollback
 ```
 
 Откат восстанавливает прежние файлы, в том числе ранее установленное локальное исправление. Если после установки файл редактировали вручную, откат останавливается, сохраняя эти изменения. Официальные программы остаются доступны по прежним путям. Резервные копии и записи установки находятся в `~/.codex/context-accounting-fix/transactions/` каждой ОС. Для установки без сети скачайте `release.json`, `install-helper.cjs`, `preload.cjs` и ZIP нужных платформ из одного релиза в одну папку, затем укажите `-AssetDirectory C:\путь\к\папке`.
