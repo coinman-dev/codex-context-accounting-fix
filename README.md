@@ -2,13 +2,41 @@
 
 # Codex context accounting fix
 
-[![Codex 0.159.2](https://img.shields.io/badge/Codex-0.159.2-10A37F.svg)](#building)
+[![Codex 0.160.0](https://img.shields.io/badge/Codex-0.160.0-10A37F.svg)](#automatic-installation-windows-and-wsl2)
 [![Windows | Ubuntu/WSL2](https://img.shields.io/badge/Windows%20%7C%20Ubuntu%2FWSL2-x64-0078D4.svg)](#installation)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**codex-context-accounting-fix** is a local fix for **Codex 0.159.2** running in Zed on Windows and Ubuntu/WSL2. Without it Codex counts stored reasoning twice and compacts a chat long before the context is full. The repository holds the patch, the scripts that install the rebuilt binary next to the official one, and the window settings that let a chat use the model's whole input.
+**codex-context-accounting-fix** fixes premature compaction in **Codex 0.159.2 and 0.160.0** on Windows and Ubuntu/WSL2. The **0.160.0 prerelease** provides rebuilt binaries and a PowerShell installer for Zed and the terminal. The fix prevents stored reasoning from being counted twice.
 
-Only the sources needed to reproduce the fix are stored here. Built binaries, model catalogs, logs and account data are not.
+Only reproducible sources are committed here. Binaries are distributed through GitHub Releases; model catalogs, logs and account data are not published.
+
+## Automatic installation: Windows and WSL2
+
+Download and run the installer from [v0.160.0-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.160.0-reasoning.1):
+
+```powershell
+Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.160.0-reasoning.1/install.ps1 -OutFile .\install-codex-fix.ps1
+powershell -ExecutionPolicy Bypass -File .\install-codex-fix.ps1
+```
+
+Run as your regular Windows user. Administrator rights, Python for Windows and a Rust toolchain are not required. Windows needs x64, PowerShell 5.1+, and Node.js 20+; the installer can use Zed's bundled Node.js. WSL2 needs x86_64, Python 3, Node.js 20+, glibc 2.35+, OpenSSL 3 and libcap (Ubuntu 22.04+). If Node.js is missing, start the Codex agent in Zed once or install Node.js in that OS.
+
+The script downloads the matching release archives, verifies SHA-256 for the archives and their contents, stages both installations, and then switches the stock Zed `codex-acp` agent to the patched files. It discovers WSL2 distros with an existing Codex profile and skips Docker's service distros. It installs under `~/.codex/context-accounting-fix/`, adds a `codex` launcher to the user PATH, backs up affected files, and checks app-server startup and ACP startup where the adapter is installed. The checks create empty threads and send no model prompts. A startup failure triggers rollback of the prepared installations.
+
+Existing context-window settings are preserved; increasing the window is a separate choice. After installation choose **⋯ → Reload Agent** in Zed when current work finishes. Open a new terminal to use the patched `codex`. An explicit executable path, shell alias/function, or a system PATH entry taking priority can still select another Codex; `Get-Command codex -All` / `type -a codex` shows which command your shell selects.
+
+```powershell
+.\install-codex-fix.ps1 -WindowsOnly          # Windows only
+.\install-codex-fix.ps1 -WslOnly -Distro Ubuntu # One WSL2 distro
+.\install-codex-fix.ps1 -SkipCli              # Connect Zed only
+.\install-codex-fix.ps1 -SkipZed              # Install the terminal command only
+.\install-codex-fix.ps1 -Check                # Verify the installed binaries
+.\install-codex-fix.ps1 -Rollback             # Restore the previous installation
+```
+
+Rollback restores the previous files, including an earlier local fix. It stops if an affected file was edited after installation, so your edits are preserved. Existing official executables remain available at their original paths. Backups and transaction records are under `~/.codex/context-accounting-fix/transactions/` in each OS. For offline installation, download `release.json`, `install-helper.cjs`, `preload.cjs`, and the required platform ZIPs from the same release into one folder, then pass `-AssetDirectory C:\path\to\folder`.
+
+The archives include the platform resources from the official 0.160.0 npm packages, verified against npm SHA-512, plus the patched CLI and its source patch. Windows SQL migrations are normalized to CRLF to match the official Windows database checksums. Linux is built on Ubuntu 22.04. The build workflow pins upstream commit `a956835d020762cb2b570053af06f643a11c0ecc` and verifies upstream V8 assets against the checked-in manifests.
 
 ## Why compact started too early
 
@@ -24,6 +52,9 @@ The patch decides how reasoning is counted from the request mode, keeps the prev
 
 | File | Purpose |
 | --- | --- |
+| [`install.ps1`](install.ps1) | Downloads and installs prerelease binaries on Windows and WSL2; supports checks and rollback |
+| [`scripts/install-helper.cjs`](scripts/install-helper.cjs) | Verifies packages, edits Zed JSONC, and performs installation transactions |
+| [`.github/workflows/build-prerelease.yml`](.github/workflows/build-prerelease.yml) | Builds Windows/Linux 0.160.0 and runs accounting regression tests |
 | [`patches/codex-0.159.2-reasoning-accounting.patch`](patches/codex-0.159.2-reasoning-accounting.patch) | The patch for the Codex sources |
 | [`bootstrap/preload.cjs`](bootstrap/preload.cjs) | Portable loader that points the stock `codex-acp` agent at the installed binary |
 | [`scripts/install.py`](scripts/install.py) | Installer |
@@ -35,6 +66,8 @@ The patch decides how reasoning is counted from the request mode, keeps the prev
 | [`scripts/create-catalog.py`](scripts/create-catalog.py) | Model catalog generator |
 
 ## Building
+
+The automated 0.160.0 build is in the workflow above. The following commands describe the original local 0.159.2 build; the same patch applies to both versions.
 
 Clone [OpenAI Codex](https://github.com/openai/codex) at tag `rust-v0.159.2` and apply the patch in the root of its sources:
 

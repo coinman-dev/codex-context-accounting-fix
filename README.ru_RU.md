@@ -2,13 +2,41 @@
 
 # Codex: исправление учёта контекста
 
-[![Codex 0.159.2](https://img.shields.io/badge/Codex-0.159.2-10A37F.svg)](#сборка)
+[![Codex 0.160.0](https://img.shields.io/badge/Codex-0.160.0-10A37F.svg)](#автоматическая-установка-windows-и-wsl2)
 [![Windows | Ubuntu/WSL2](https://img.shields.io/badge/Windows%20%7C%20Ubuntu%2FWSL2-x64-0078D4.svg)](#установка)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**codex-context-accounting-fix** — локальное исправление для **Codex 0.159.2** в Zed на Windows и Ubuntu/WSL2. Без него Codex дважды учитывает сохранённые рассуждения и сжимает чат задолго до заполнения контекста. В репозитории лежат патч, скрипты установки пересобранного файла рядом с официальным и настройки окна, при которых чат использует весь вход модели.
+**codex-context-accounting-fix** исправляет преждевременное сжатие в **Codex 0.159.2 и 0.160.0** на Windows и Ubuntu/WSL2. В **prerelease 0.160.0** доступны пересобранные программы и PowerShell-установщик для Zed и терминала. Исправление предотвращает повторный учёт сохранённых рассуждений.
 
-Здесь хранятся только исходники для воспроизведения. Собранные программы, каталоги моделей, журналы и данные учётной записи в репозиторий не входят.
+Здесь хранятся исходники для воспроизведения. Программы распространяются через GitHub Releases; каталоги моделей, журналы и данные учётной записи не публикуются.
+
+## Автоматическая установка: Windows и WSL2
+
+Скачайте и запустите установщик из [v0.160.0-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.160.0-reasoning.1):
+
+```powershell
+Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.160.0-reasoning.1/install.ps1 -OutFile .\install-codex-fix.ps1
+powershell -ExecutionPolicy Bypass -File .\install-codex-fix.ps1
+```
+
+Запускайте от обычного пользователя Windows. Права администратора, Python в Windows и инструменты сборки Rust не нужны. Для Windows требуются x64, PowerShell 5.1+ и Node.js 20+; установщик умеет использовать Node.js из Zed. Для WSL2 требуются x86_64, Python 3, Node.js 20+, glibc 2.35+, OpenSSL 3 и libcap — подходит Ubuntu 22.04 и новее. Если Node.js не найден, один раз запустите агент Codex в Zed или установите Node.js в нужной ОС.
+
+Скрипт скачивает архивы нужных платформ, проверяет SHA-256 архивов и их содержимого, подготавливает обе установки и подключает исправленные файлы к штатному агенту Zed `codex-acp`. Он находит дистрибутивы WSL2 с существующим профилем Codex и пропускает служебные дистрибутивы Docker. Файлы устанавливаются в `~/.codex/context-accounting-fix/`; команда `codex` добавляется в пользовательский PATH. Скрипт сохраняет резервные копии и проверяет запуск app-server, а при наличии адаптера — ACP. Проверки создают пустые чаты и не отправляют запросов модели. Если проверка запуска не проходит, подготовленные установки откатываются.
+
+Настройки размера контекста сохраняются; увеличение окна — отдельный выбор. После установки выберите **⋯ → Reload Agent** в Zed, когда текущая работа завершится. Для команды `codex` откройте новый терминал. Явный путь к программе, alias или функция оболочки, а также более приоритетный системный PATH могут выбирать другой Codex; выбор можно проверить через `Get-Command codex -All` / `type -a codex`.
+
+```powershell
+.\install-codex-fix.ps1 -WindowsOnly           # Только Windows
+.\install-codex-fix.ps1 -WslOnly -Distro Ubuntu # Один дистрибутив WSL2
+.\install-codex-fix.ps1 -SkipCli               # Подключить только Zed
+.\install-codex-fix.ps1 -SkipZed               # Установить только команду терминала
+.\install-codex-fix.ps1 -Check                 # Проверить установленную сборку
+.\install-codex-fix.ps1 -Rollback              # Вернуть предыдущую установку
+```
+
+Откат восстанавливает прежние файлы, в том числе ранее установленное локальное исправление. Если после установки файл редактировали вручную, откат останавливается, сохраняя эти изменения. Официальные программы остаются доступны по прежним путям. Резервные копии и записи установки находятся в `~/.codex/context-accounting-fix/transactions/` каждой ОС. Для установки без сети скачайте `release.json`, `install-helper.cjs`, `preload.cjs` и ZIP нужных платформ из одного релиза в одну папку, затем укажите `-AssetDirectory C:\путь\к\папке`.
+
+Архивы содержат служебные файлы официальных npm-пакетов 0.160.0, проверенных по SHA-512 npm, исправленный Codex и патч исходников. SQL-миграции Windows приведены к CRLF, чтобы совпадать с контрольными суммами официальных Windows-баз. Linux собирается на Ubuntu 22.04. Workflow закрепляет исходники `a956835d020762cb2b570053af06f643a11c0ecc` и проверяет файлы V8 по контрольным суммам из исходного дерева.
 
 ## Почему compact срабатывал раньше времени
 
@@ -24,6 +52,9 @@
 
 | Файл | Назначение |
 | --- | --- |
+| [`install.ps1`](install.ps1) | Скачивание и установка prerelease в Windows и WSL2, проверка и откат |
+| [`scripts/install-helper.cjs`](scripts/install-helper.cjs) | Проверка файлов, правка JSONC-настроек Zed и транзакции установки |
+| [`.github/workflows/build-prerelease.yml`](.github/workflows/build-prerelease.yml) | Сборка Windows/Linux 0.160.0 и проверки расчёта контекста |
 | [`patches/codex-0.159.2-reasoning-accounting.patch`](patches/codex-0.159.2-reasoning-accounting.patch) | Патч для исходников Codex |
 | [`bootstrap/preload.cjs`](bootstrap/preload.cjs) | Переносимый загрузчик: направляет штатный агент `codex-acp` на установленный файл |
 | [`scripts/install.py`](scripts/install.py) | Установщик |
@@ -35,6 +66,8 @@
 | [`scripts/create-catalog.py`](scripts/create-catalog.py) | Генератор каталога моделей |
 
 ## Сборка
+
+Автоматическая сборка 0.160.0 описана в workflow выше. Команды ниже относятся к исходной локальной сборке 0.159.2; один патч применяется к обеим версиям.
 
 Клонируйте [OpenAI Codex](https://github.com/openai/codex) с тегом `rust-v0.159.2` и примените патч в корне его исходников:
 

@@ -3,6 +3,7 @@ import argparse
 import base64
 import hashlib
 import json
+import re
 from pathlib import Path
 import tarfile
 from urllib.request import Request, urlopen
@@ -18,7 +19,7 @@ def main():
     root = Path(__file__).resolve().parents[1] / "build" / ("vendor-" + args.version + "-" + args.platform)
     if root.exists():
         raise FileExistsError(f"Vendor directory already exists: {root}")
-    if not __import__('re').fullmatch(r"\d+\.\d+\.\d+", args.version):
+    if not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
         raise ValueError("Expected a numeric upstream version")
     meta_url = f"https://registry.npmjs.org/@openai%2fcodex/{args.version}-{platform}"
     metadata = json.load(urlopen(Request(meta_url, headers={"User-Agent": "codex-context-accounting-fix"}), timeout=30))
