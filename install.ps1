@@ -61,7 +61,7 @@ function Quote-ProcessArgument([string]$Value) {
     if ($Value -and $Value -notmatch '[\s"]') { return $Value }
     return '"' + ([regex]::Replace([regex]::Replace($Value, '(\\*)"', '$1$1\"'), '(\\+)$', '$1$1')) + '"'
 }
-function Invoke-Captured([string]$Executable, [string[]]$Arguments, [string]$InputText = '') {
+function Invoke-Captured([string]$Executable, [string[]]$Arguments, [string]$InputText = '', [scriptblock]$InputWriter = $null) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $Executable
     $info.Arguments = (($Arguments | ForEach-Object { Quote-ProcessArgument $_ }) -join ' ')
@@ -77,8 +77,15 @@ function Invoke-Captured([string]$Executable, [string[]]$Arguments, [string]$Inp
     [void]$process.Start()
     $stdout = $process.StandardOutput.ReadToEndAsync()
     $stderr = $process.StandardError.ReadToEndAsync()
-    if ($InputText) { $process.StandardInput.Write($InputText.Replace("`r`n", "`n")) }
-    $process.StandardInput.Close()
+    # .NET Framework used by PowerShell 5.1 has no StandardInputEncoding option.
+    $inputStream = [System.IO.StreamWriter]::new($process.StandardInput.BaseStream, $utf8, 65536)
+    try {
+        if ($InputWriter) { & $InputWriter $inputStream }
+        elseif ($InputText) { $inputStream.Write($InputText.Replace("`r`n", "`n")) }
+    } catch {
+        if (-not $process.HasExited) { $process.Kill() }
+        throw
+    } finally { $inputStream.Dispose() }
     if (-not $process.WaitForExit(180000)) { $process.Kill(); throw "Process timed out: $Executable" }
     $output = $stdout.GetAwaiter().GetResult()
     $errors = $stderr.GetAwaiter().GetResult()
@@ -154,18 +161,33 @@ if p['operation'] == 'preflight':
     raise SystemExit(0)
 if not node:
     raise SystemExit('Node.js 20+ is required')
-if p['operation'] == 'prepare':
-    windows = pathlib.Path(subprocess.check_output(['wslpath', '-u', p['cache']], text=True).strip())
+def digest_file(path):
+    value = hashlib.sha256()
+    with path.open('rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            value.update(block)
+    return value.hexdigest()
+if p['operation'] == 'asset-plan':
     cache = root / 'downloads' / p['release']
     cache.mkdir(parents=True, exist_ok=True)
-    manifest = json.loads((windows / 'release.json').read_text(encoding='utf-8-sig'))
+    missing = []
+    for name, expected in p['assets'].items():
+        if pathlib.PurePosixPath(name).name != name or '/' in name or '\\' in name or len(expected) != 64:
+            raise SystemExit('Unsafe transfer asset')
+        file = cache / name
+        if not file.is_file() or digest_file(file) != expected:
+            missing.append(name)
+    print(json.dumps({'cache': str(cache), 'missing': missing}))
+    raise SystemExit(0)
+if p['operation'] == 'prepare':
+    cache = root / 'downloads' / p['release']
+    cache.mkdir(parents=True, exist_ok=True)
+    manifest = json.loads((cache / 'release.json').read_text(encoding='utf-8-sig'))
     for name in ('install-helper.cjs', 'preload.cjs', p['archive']):
-        source = windows / name
         destination = cache / name
         expected = manifest['assets'][name]['sha256']
-        if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+        if digest_file(destination) != expected:
             raise SystemExit('WSL transfer checksum mismatch: ' + name)
-        shutil.copyfile(source, destination)
     package = cache / 'package'
     package.mkdir(exist_ok=True)
     with zipfile.ZipFile(cache / p['archive']) as archive:
@@ -199,6 +221,68 @@ function Invoke-WslAction([string]$Name, $Payload) {
     $script = $wslScript.Replace('__PAYLOAD__', $encoded)
     $text = Invoke-Captured 'wsl.exe' @('-d', $Name, '--', 'bash', '-s') $script
     return ($text | ConvertFrom-Json)
+}
+function Quote-BashArgument([string]$Value) {
+    return "'" + $Value.Replace("'", "'" + '"' + "'" + '"' + "'") + "'"
+}
+function Send-WslAssets([string]$Name, [string]$Cache, $Manifest, [string]$Archive) {
+    $hashes = [ordered]@{'release.json'=(Get-Sha256 (Join-Path $Cache 'release.json'))}
+    foreach ($filename in @('install-helper.cjs', 'preload.cjs', $Archive)) {
+        $hashes[$filename] = $Manifest.assets.PSObject.Properties[$filename].Value.sha256
+    }
+    $plan = Invoke-WslAction $Name @{operation='asset-plan'; release=$Release; assets=$hashes}
+    if (@($plan.missing).Count -eq 0) { return }
+    Write-Host "Transferring verified assets to WSL2 $Name ..."
+    # Send a small JSON header followed by raw file bytes. Python reads large
+    # chunks directly; no Windows drive mount or shell parsing of archive data.
+    $receiver = @'
+import hashlib, json, os, pathlib, re, sys
+stream = sys.stdin.buffer
+header = json.loads(stream.readline(65536))
+cache = pathlib.Path(header['cache'])
+cache.mkdir(parents=True, exist_ok=True)
+transaction = header['transaction']
+if not re.fullmatch(r'[a-f0-9]{32}', transaction):
+    raise SystemExit('Invalid transfer transaction')
+for asset in header['assets']:
+    name, expected, size = asset['name'], asset['sha256'], asset['bytes']
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', name) or not re.fullmatch(r'[a-f0-9]{64}', expected) or not 0 <= size <= 2 * 1024**3:
+        raise SystemExit('Invalid transfer asset')
+    temporary = cache / (name + '.transfer-' + transaction)
+    digest = hashlib.sha256()
+    remaining = size
+    with temporary.open('wb') as output:
+        while remaining:
+            block = stream.read(min(1024 * 1024, remaining))
+            if not block:
+                raise SystemExit('Incomplete asset transfer: ' + name)
+            output.write(block)
+            digest.update(block)
+            remaining -= len(block)
+    if digest.hexdigest() != expected:
+        raise SystemExit('Asset transfer checksum mismatch: ' + name)
+    os.replace(temporary, cache / name)
+print('Asset transfer verified')
+'@
+    $encodedReceiver = [Convert]::ToBase64String($utf8.GetBytes($receiver))
+    $receiverCommand = "exec(__import__('base64').b64decode('" + $encodedReceiver + "'))"
+    $assets = @()
+    foreach ($filename in $plan.missing) {
+        if ($filename -notmatch '^[A-Za-z0-9._-]+$' -or $hashes[$filename] -notmatch '^[a-f0-9]{64}$') { throw 'Invalid transfer asset.' }
+        $assets += @{name=$filename; sha256=$hashes[$filename]; bytes=(Get-Item -LiteralPath (Join-Path $Cache $filename)).Length}
+    }
+    $header = @{cache=$plan.cache; transaction=$transactionId; assets=@($assets)} | ConvertTo-Json -Depth 8 -Compress
+    $writer = {
+        param($InputStream)
+        $InputStream.Write($header + "`n")
+        $InputStream.Flush()
+        foreach ($filename in $plan.missing) {
+            $file = [System.IO.File]::OpenRead((Join-Path $Cache $filename))
+            try { $file.CopyTo($InputStream.BaseStream, 1048576) }
+            finally { $file.Dispose() }
+        }
+    }
+    Invoke-Captured 'wsl.exe' @('-d', $Name, '--exec', 'python3', '-c', $receiverCommand) '' $writer | Out-Null
 }
 function Invoke-WindowsAction($Node, $Helper, $Payload) {
     $request = Join-Path $root ('downloads\request-' + $transactionId + '.json')
@@ -318,6 +402,7 @@ try {
         Write-Host "Prepared Windows: $($result.version)"
     }
     foreach ($name in $targets) {
+        Send-WslAssets $name $cache $manifest $linuxArchive
         $result = Invoke-WslAction $name @{operation='prepare'; transactionId=$transactionId; cache=$cache; release=$Release; archive=$linuxArchive; connectZed=(-not $SkipZed); installCli=(-not $SkipCli)}
         $preparedWsl += $name
         $state.wsl = @($preparedWsl)

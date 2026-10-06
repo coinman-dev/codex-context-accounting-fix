@@ -24,6 +24,8 @@ Run as your regular Windows user. Administrator rights, Python for Windows and a
 
 The commands save the script in your user folder, so they also work when PowerShell opens in `C:\Windows\system32`.
 
+Windows-to-WSL transfers use `wsl.exe` stdin and verify SHA-256 in Linux. They work with Windows drive automount disabled and with spaces in the Windows profile path; valid cached archives are reused.
+
 The script downloads the matching release archives, verifies SHA-256 for the archives and their contents, stages both installations, and then switches the stock Zed `codex-acp` agent to the patched files. It discovers WSL2 distros with an existing Codex profile and skips Docker's service distros. It installs under `~/.codex/context-accounting-fix/`, adds a `codex` launcher to the user PATH, backs up affected files, and checks app-server startup and ACP startup where the adapter is installed. The checks create empty threads and send no model prompts. A startup failure triggers rollback of the prepared installations.
 
 If you have not signed in to Codex yet, the installer verifies startup and reports that authentication is required. Sign in through Zed before starting a chat. Each startup probe waits for the previous process to exit before opening the same SQLite profile again.
