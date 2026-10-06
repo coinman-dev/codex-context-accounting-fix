@@ -4,6 +4,7 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import sys
 from urllib.request import urlopen
 
 
@@ -14,7 +15,7 @@ def main():
     args = parser.parse_args()
     source = args.source.resolve()
     version = subprocess.check_output(
-        ['python3' if os.name != 'nt' else 'python', str(source / '.github/scripts/rusty_v8_bazel.py'),
+        [sys.executable, str(source / '.github/scripts/rusty_v8_bazel.py'),
          'resolved-v8-crate-version'], cwd=source, text=True).strip()
     profile = 'ptrcomp_sandbox_release'
     stem = f'{profile}_{args.target}'
