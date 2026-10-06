@@ -87,8 +87,8 @@ jobs:
         working-directory: build/upstream/codex-rs
         shell: bash
         run: |
-          cargo test --release --locked -p codex-core --test all -- all_turns_reasoning_without_header_does_not_compact_twice auto_compact_accounts_for_encrypted_reasoning auto_compact_body_after_prefix_still_caps_at_context_window
-          cargo test --release --locked -p codex-chatgpt
+          cargo test --locked -p codex-core --test all -- all_turns_reasoning_without_header_does_not_compact_twice auto_compact_accounts_for_encrypted_reasoning auto_compact_body_after_prefix_still_caps_at_context_window
+          cargo test --locked -p codex-chatgpt
       - name: Package verified binaries
         shell: bash
         run: python scripts/package-release.py --platform ${{ matrix.platform }} --binary build/upstream/codex-rs/target/release/${{ matrix.binary }}

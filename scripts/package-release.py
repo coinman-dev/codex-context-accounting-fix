@@ -22,6 +22,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--platform', choices=['windows', 'linux'], required=True)
     parser.add_argument('--binary', required=True, type=Path)
+    parser.add_argument('--stage-dir', type=Path,
+                        help='Use an ext4 staging directory when packaging Linux from WSL')
     args = parser.parse_args()
     windows = args.platform == 'windows'
     target = 'x86_64-pc-windows-msvc' if windows else 'x86_64-unknown-linux-gnu'
@@ -32,7 +34,7 @@ def main():
         raise ValueError('Official helper version mismatch')
     dist = ROOT / 'build/dist'
     dist.mkdir(parents=True, exist_ok=True)
-    stage = ROOT / f'build/package-{args.platform}'
+    stage = args.stage_dir or ROOT / f'build/package-{args.platform}'
     if stage.exists():
         raise FileExistsError(stage)
     shutil.copytree(vendor, stage)
