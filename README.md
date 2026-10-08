@@ -26,6 +26,8 @@ The commands save the script in your user folder, so they also work when PowerSh
 
 Windows-to-WSL transfers use `wsl.exe` stdin and verify SHA-256 in Linux. They work with Windows drive automount disabled and with spaces in the Windows profile path; valid cached archives are reused.
 
+After both installations pass startup checks, the installer removes its downloads and expanded staging copies in each OS. It retains the active release, releases used by running processes, and all versions referenced by saved rollback records. An older `0.159.2-reasoning-*` folder can therefore still be necessary for rollback. Settings, sign-in data, chats, and compiler caches are outside this cleanup. Offline `-AssetDirectory` source files are preserved. Use `-KeepDownloads` to retain download archives while removing expanded copies.
+
 The script downloads the matching release archives, verifies SHA-256 for the archives and their contents, stages both installations, and then switches the stock Zed `codex-acp` agent to the patched files. It discovers WSL2 distros with an existing Codex profile and skips Docker's service distros. It installs under `~/.codex/context-accounting-fix/`, adds a `codex` launcher to the user PATH, backs up affected files, and checks app-server startup and ACP startup where the adapter is installed. The checks create empty threads and send no model prompts. A startup failure triggers rollback of the prepared installations.
 
 If you have not signed in to Codex yet, the installer verifies startup and reports that authentication is required. Sign in through Zed before starting a chat. Each startup probe waits for the previous process to exit before opening the same SQLite profile again.
@@ -39,9 +41,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -SkipCli
 powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -SkipZed
 powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -Check
 powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -Rollback
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -Cleanup
+powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -KeepDownloads
 ```
 
 Rollback restores the previous files, including an earlier local fix. It stops if an affected file was edited after installation, so your edits are preserved. Existing official executables remain available at their original paths. Backups and transaction records are under `~/.codex/context-accounting-fix/transactions/` in each OS. For offline installation, download `release.json`, `install-helper.cjs`, `preload.cjs`, and the required platform ZIPs from the same release into one folder, then pass `-AssetDirectory C:\path\to\folder`.
+
+Offline installation also requires `cleanup.cjs`. The `-Cleanup` mode clears an existing installation without reinstalling binaries. Installer and cleanup runs are serialized; cleanup refuses pending installations, changed binaries, and symlinks/junctions in deletion candidates. A later reinstall can download archives again after automatic cleanup.
 
 The archives include the platform resources from the official 0.160.0 npm packages, verified against npm SHA-512, plus the patched CLI and its source patch. Windows SQL migrations are normalized to CRLF to match the official Windows database checksums. Both prerelease binaries were built locally in WSL2: Windows through `cargo-xwin`, Linux inside an Ubuntu 22.04 build environment. The Linux binary's highest glibc requirement is `GLIBC_2.35`. The build scripts pin upstream commit `a956835d020762cb2b570053af06f643a11c0ecc` and verify upstream V8 assets against the checked-in manifests.
 

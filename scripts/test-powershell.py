@@ -45,6 +45,7 @@ def main():
                 output.write(file, file.relative_to(package).as_posix())
     shutil.copy2(ROOT / 'scripts/install-helper.cjs', assets / 'install-helper.cjs')
     shutil.copy2(ROOT / 'bootstrap/preload.cjs', assets / 'preload.cjs')
+    shutil.copy2(ROOT / 'scripts/cleanup.cjs', assets / 'cleanup.cjs')
     script = ROOT / 'install.ps1'
     flags = ['-WindowsOnly']
     if args.wsl_distro:
@@ -92,7 +93,15 @@ def main():
     current = home / '.codex/context-accounting-fix/current.json'
     installed = current.read_bytes()
     assert json.loads(installed)['version'] == '0.160.0-reasoning.1'
+    assert not (current.parent / 'downloads').exists(), 'Successful installation must remove scratch downloads'
+    assert (assets / archive.name).exists(), 'Offline source archives must remain intact'
+    with (current.parent / 'installer.lock').open('rb'):
+        locked = subprocess.run(base + flags + ['-Cleanup', '-AssetDirectory', str(assets)], env=env, capture_output=True, timeout=30)
+        assert locked.returncode != 0 and b'Another installer or cleanup' in locked.stderr
+    assert current.read_bytes() == installed, 'A concurrent cleanup must leave the installation unchanged'
+    run(*flags, '-Cleanup', '-AssetDirectory', str(assets))
     run(*flags, '-Check')
+    assert not (current.parent / 'downloads').exists(), 'Checks must not recreate downloads'
     run(*flags, '-SkipCli', '-AssetDirectory', str(assets))
     run('-Rollback')
     assert current.read_bytes() == installed

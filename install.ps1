@@ -19,11 +19,14 @@ param(
     [switch]$SkipCli,
     [switch]$Rollback,
     [switch]$Check,
+    [switch]$Cleanup,
+    [switch]$KeepDownloads,
     [string]$AssetDirectory
 )
 $ErrorActionPreference = 'Stop'
 if ($WindowsOnly -and $WslOnly) { throw 'Choose either -WindowsOnly or -WslOnly.' }
 if ($Rollback -and $Check) { throw 'Choose either -Rollback or -Check.' }
+if ($Cleanup -and ($Rollback -or $Check)) { throw 'Use -Cleanup separately from -Rollback and -Check.' }
 if ($env:OS -ne 'Windows_NT') { throw 'Run install.ps1 from Windows PowerShell.' }
 $repo = 'coinman-dev/codex-context-accounting-fix'
 $root = Join-Path $env:USERPROFILE '.codex\context-accounting-fix'
@@ -179,7 +182,13 @@ if p['operation'] == 'asset-plan':
             missing.append(name)
     print(json.dumps({'cache': str(cache), 'missing': missing}))
     raise SystemExit(0)
-if p['operation'] == 'prepare':
+if p['operation'] == 'cleanup':
+    maintenance = root / 'maintenance'
+    maintenance.mkdir(parents=True, exist_ok=True)
+    helper = maintenance / 'cleanup.cjs'
+    helper.write_bytes(base64.b64decode(p['cleanupCode']))
+    request = {'keepDownloads': p.get('keepDownloads', False), 'dryRun': p.get('dryRun', False)}
+elif p['operation'] == 'prepare':
     cache = root / 'downloads' / p['release']
     cache.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((cache / 'release.json').read_text(encoding='utf-8-sig'))
@@ -207,7 +216,7 @@ else:
     request = {'operation': p['operation']}
     if p.get('transactionId'):
         request['transactionId'] = p['transactionId']
-request_file = root / 'downloads' / ('request-' + p.get('transactionId', 'check') + '.json')
+request_file = root / 'maintenance' / ('request-' + p.get('transactionId', 'check') + '.json')
 request_file.parent.mkdir(parents=True, exist_ok=True)
 request_file.write_text(json.dumps(request))
 result = subprocess.run([node, str(helper), str(request_file)], text=True, capture_output=True)
@@ -285,10 +294,28 @@ print('Asset transfer verified')
     Invoke-Captured 'wsl.exe' @('-d', $Name, '--exec', 'python3', '-c', $receiverCommand) '' $writer | Out-Null
 }
 function Invoke-WindowsAction($Node, $Helper, $Payload) {
-    $request = Join-Path $root ('downloads\request-' + $transactionId + '.json')
+    $request = Join-Path $root ('maintenance\request-' + $transactionId + '.json')
     Write-JsonFile $request $Payload
     $text = Invoke-Captured $Node @($Helper, $request)
     return ($text | ConvertFrom-Json)
+}
+function Invoke-ManagedCleanup($CodePath, $WslTargets, [bool]$CleanWindows) {
+    $code = [System.IO.File]::ReadAllBytes($CodePath)
+    $encoded = [Convert]::ToBase64String($code)
+    if ($CleanWindows) {
+        $installedTool = Join-Path $root 'maintenance\cleanup.cjs'
+        [System.IO.Directory]::CreateDirectory((Split-Path -Parent $installedTool)) | Out-Null
+        [System.IO.File]::WriteAllBytes($installedTool, $code)
+        $running = @(Get-CimInstance Win32_Process -Filter "Name = 'codex.exe'" | ForEach-Object { $_.ExecutablePath } | Where-Object { $_ })
+        $result = Invoke-WindowsAction $node $installedTool @{keepDownloads=[bool]$KeepDownloads; runningExecutables=$running}
+        Write-Host ('Windows cleanup: freed {0:N1} MiB; retained versions: {1}' -f ($result.bytes / 1MB), ($result.retainedVersions -join ', '))
+        foreach ($item in $result.skipped) { Write-Warning ('Cleanup skipped: ' + $item.path + ': ' + $item.reason) }
+    }
+    foreach ($name in $WslTargets) {
+        $result = Invoke-WslAction $name @{operation='cleanup'; cleanupCode=$encoded; keepDownloads=[bool]$KeepDownloads}
+        Write-Host ('WSL2 {0} cleanup: freed {1:N1} MiB; retained versions: {2}' -f $name, ($result.bytes / 1MB), ($result.retainedVersions -join ', '))
+        foreach ($item in $result.skipped) { Write-Warning ('Cleanup skipped: ' + $item.path + ': ' + $item.reason) }
+    }
 }
 function Get-Asset([string]$Name, $Manifest, [string]$Cache) {
     if ($Name -notmatch '^[A-Za-z0-9._-]+$') { throw 'Invalid release asset name.' }
@@ -309,6 +336,10 @@ function Get-Asset([string]$Name, $Manifest, [string]$Cache) {
 }
 
 $statePath = Join-Path $root 'last-powershell-install.json'
+[System.IO.Directory]::CreateDirectory($root) | Out-Null
+try { $installationLock = [System.IO.File]::Open((Join-Path $root 'installer.lock'), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None) }
+catch { throw 'Another installer or cleanup is running. Wait for it to finish.' }
+try {
 $node = $null
 if (-not $WslOnly) { $node = Find-WindowsNode }
 if ($Rollback) {
@@ -379,6 +410,11 @@ else {
 }
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $cache 'release.json') | ConvertFrom-Json
 if ($manifest.schema -ne 1 -or $manifest.tag -ne $Release -or $manifest.upstream_version -ne '0.160.0') { throw 'Unexpected release manifest.' }
+$cleanupTool = Get-Asset 'cleanup.cjs' $manifest $cache
+if ($Cleanup) {
+    Invoke-ManagedCleanup $cleanupTool $targets (-not $WslOnly)
+    return
+}
 $helper = Get-Asset 'install-helper.cjs' $manifest $cache
 Get-Asset 'preload.cjs' $manifest $cache | Out-Null
 $windowsArchive = 'codex-0.160.0-reasoning-windows-x64.zip'
@@ -393,7 +429,8 @@ $pathBefore = [Environment]::GetEnvironmentVariable('Path', 'User')
 $state = [ordered]@{transactionId=$transactionId; release=$Release; windows=$false; wsl=@(); pathBefore=$pathBefore; pathAfter=$pathBefore; pathChanged=$false; previousStateFile=$null; state='preparing'}
 try {
     if (-not $WslOnly) {
-        $package = Join-Path $cache ('package-windows-' + $transactionId)
+        $package = Join-Path $root ('downloads\staging\package-windows-' + $transactionId)
+        [System.IO.Directory]::CreateDirectory((Split-Path -Parent $package)) | Out-Null
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         [System.IO.Compression.ZipFile]::ExtractToDirectory($archive, $package)
         $result = Invoke-WindowsAction $node $helper @{operation='prepare'; transactionId=$transactionId; packageDir=$package; assetsDir=$cache; connectZed=(-not $SkipZed); installCli=(-not $SkipCli)}
@@ -456,4 +493,7 @@ try {
     throw $failure
 }
 Write-Host "Installed $Release. Backups: $root\transactions\$transactionId"
+try { Invoke-ManagedCleanup $cleanupTool $preparedWsl $preparedWindows }
+catch { Write-Warning ('Installation passed, but cleanup needs attention: ' + $_) }
 Write-Host 'Reload the Codex agent in Zed after current work finishes, and open a new terminal for codex.'
+} finally { $installationLock.Dispose() }

@@ -35,6 +35,7 @@ def main():
         platforms[platform] = {'build_target': manifest['build_target'], 'binary_sha256': manifest['binary_sha256']}
     for source, name in ((ROOT / 'install.ps1', 'install.ps1'),
                          (ROOT / 'scripts/install-helper.cjs', 'install-helper.cjs'),
+                         (ROOT / 'scripts/cleanup.cjs', 'cleanup.cjs'),
                          (ROOT / 'bootstrap/preload.cjs', 'preload.cjs'),
                          (ROOT / 'patches/codex-0.159.2-reasoning-accounting.patch', 'source.patch')):
         destination = DIST / name
