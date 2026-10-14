@@ -94,6 +94,7 @@ def main():
     installed = current.read_bytes()
     assert json.loads(installed)['version'] == '0.162.1-reasoning.1'
     assert not (current.parent / 'downloads').exists(), 'Successful installation must remove scratch downloads'
+    assert not list((current.parent / 'maintenance').glob('request-*.json')), 'Installer requests must not be left behind'
     assert (assets / archive.name).exists(), 'Offline source archives must remain intact'
     with (current.parent / 'installer.lock').open('rb'):
         locked = subprocess.run(base + flags + ['-Cleanup', '-AssetDirectory', str(assets)], env=env, capture_output=True, timeout=30)
@@ -101,6 +102,10 @@ def main():
     assert current.read_bytes() == installed, 'A concurrent cleanup must leave the installation unchanged'
     run(*flags, '-Cleanup', '-AssetDirectory', str(assets))
     run(*flags, '-Check')
+    if args.wsl_distro:
+        command = 'ls ' + remote + '/.codex/context-accounting-fix/maintenance\n'
+        leftovers = subprocess.run(['wsl.exe', '-d', args.wsl_distro, '--', 'bash', '-s'], input=command.encode(), capture_output=True, check=True).stdout.decode()
+        assert 'request-' not in leftovers, 'WSL installer requests must not be left behind: ' + leftovers
     assert not (current.parent / 'downloads').exists(), 'Checks must not recreate downloads'
     run(*flags, '-SkipCli', '-AssetDirectory', str(assets))
     run('-Rollback')

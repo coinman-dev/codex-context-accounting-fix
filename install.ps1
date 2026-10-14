@@ -226,7 +226,10 @@ else:
 request_file = root / 'maintenance' / ('request-' + p.get('transactionId', 'check') + '.json')
 request_file.parent.mkdir(parents=True, exist_ok=True)
 request_file.write_text(json.dumps(request))
-result = subprocess.run([node, str(helper), str(request_file)], text=True, capture_output=True)
+try:
+    result = subprocess.run([node, str(helper), str(request_file)], text=True, capture_output=True)
+finally:
+    request_file.unlink(missing_ok=True)
 if result.returncode:
     raise SystemExit(result.stderr + result.stdout)
 print(result.stdout.strip())
@@ -303,7 +306,8 @@ print('Asset transfer verified')
 function Invoke-WindowsAction($Node, $Helper, $Payload) {
     $request = Join-Path $root ('maintenance\request-' + $transactionId + '.json')
     Write-JsonFile $request $Payload
-    $text = Invoke-Captured $Node @($Helper, $request)
+    try { $text = Invoke-Captured $Node @($Helper, $request) }
+    finally { Remove-Item -LiteralPath $request -Force -ErrorAction SilentlyContinue }
     return ($text | ConvertFrom-Json)
 }
 function Invoke-ManagedCleanup($CodePath, $WslTargets, [bool]$CleanWindows) {
