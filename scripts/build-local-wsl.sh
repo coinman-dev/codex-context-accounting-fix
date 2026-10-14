@@ -4,6 +4,7 @@ set -euo pipefail
 platform="${1:?Usage: build-local-wsl.sh linux|windows /path/to/patched/upstream}"
 source_dir="${2:?Path to patched Codex checkout is required}"
 project="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+version=0.162.1
 export PATH="$HOME/.cargo/bin:$PATH"
 export RUSTUP_TOOLCHAIN=1.98.1
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-3}"
@@ -25,7 +26,7 @@ case "$platform" in
     ;;
   linux)
     export CODEX_BWRAP_SHA256
-    CODEX_BWRAP_SHA256="$(sha256sum "$project/build/vendor-0.160.0-linux/package/vendor/x86_64-unknown-linux-musl/codex-resources/bwrap" | cut -d ' ' -f1)"
+    CODEX_BWRAP_SHA256="$(sha256sum "$project/build/vendor-$version-linux/package/vendor/x86_64-unknown-linux-musl/codex-resources/bwrap" | cut -d ' ' -f1)"
     cargo build --release -p codex-cli --bin codex
     # Upstream disables its system-temp alias guard in debug builds. Release-mode
     # test binaries cannot initialize their tempfile CODEX_HOME under /tmp.

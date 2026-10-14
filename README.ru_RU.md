@@ -2,21 +2,21 @@
 
 # Codex: исправление учёта контекста
 
-[![Codex 0.160.0](https://img.shields.io/badge/Codex-0.160.0-10A37F.svg)](#автоматическая-установка-windows-и-wsl2)
+[![Codex 0.162.1](https://img.shields.io/badge/Codex-0.162.1-10A37F.svg)](#автоматическая-установка-windows-и-wsl2)
 [![Windows | Ubuntu/WSL2](https://img.shields.io/badge/Windows%20%7C%20Ubuntu%2FWSL2-x64-0078D4.svg)](#установка)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**codex-context-accounting-fix** исправляет преждевременное сжатие в **Codex 0.159.2 и 0.160.0** на Windows и Ubuntu/WSL2. В **prerelease 0.160.0** доступны пересобранные программы и PowerShell-установщик для Zed и терминала. Исправление предотвращает повторный учёт сохранённых рассуждений.
+**codex-context-accounting-fix** исправляет преждевременное сжатие в **Codex 0.159.2, 0.160.0 и 0.162.1** на Windows и Ubuntu/WSL2. В **prerelease 0.162.1** доступны пересобранные программы и PowerShell-установщик для Zed и терминала. Исправление предотвращает повторный учёт сохранённых рассуждений.
 
 Здесь хранятся исходники для воспроизведения. Программы распространяются через GitHub Releases; каталоги моделей, журналы и данные учётной записи не публикуются.
 
 ## Автоматическая установка: Windows и WSL2
 
-Скачайте и запустите установщик из [v0.160.0-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.160.0-reasoning.1):
+Скачайте и запустите установщик из [v0.162.1-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.162.1-reasoning.1):
 
 ```powershell
 $installerPath = Join-Path $env:USERPROFILE 'install-codex-fix.ps1'
-Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.160.0-reasoning.1/install.ps1 -OutFile $installerPath
+Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.162.1-reasoning.1/install.ps1 -OutFile $installerPath
 powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath
 ```
 
@@ -49,7 +49,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -KeepDownload
 
 Для установки без сети также нужен `cleanup.cjs`. Режим `-Cleanup` очищает уже установленную сборку без переустановки программ. Установка и очистка выполняются по очереди; очистка отказывается работать при незавершённой установке, изменённом бинарнике и символических ссылках или junction в удаляемых папках. После автоматической очистки следующая переустановка может скачать архивы заново.
 
-Архивы содержат служебные файлы официальных npm-пакетов 0.160.0, проверенных по SHA-512 npm, исправленный Codex и патч исходников. SQL-миграции Windows приведены к CRLF, чтобы совпадать с контрольными суммами официальных Windows-баз. Обе программы prerelease собраны локально в WSL2: Windows через `cargo-xwin`, Linux в окружении Ubuntu 22.04. Максимальное требование Linux-бинарника к glibc — `GLIBC_2.35`. Скрипты сборки закрепляют исходники `a956835d020762cb2b570053af06f643a11c0ecc` и проверяют файлы V8 по контрольным суммам из исходного дерева.
+Архивы содержат служебные файлы официальных npm-пакетов 0.162.1, проверенных по SHA-512 npm, исправленный Codex и патч исходников. SQL-миграции Windows приведены к CRLF, чтобы совпадать с контрольными суммами официальных Windows-баз. Обе программы prerelease собраны локально в WSL2: Windows через `cargo-xwin`, Linux в окружении Ubuntu 22.04. Максимальное требование Linux-бинарника к glibc — `GLIBC_2.35`. Скрипты сборки закрепляют исходники `092d3acd6bec3e3a14bdc7e7a2810ab628ab759d` и проверяют файлы V8 по контрольным суммам из исходного дерева.
 
 ## Почему compact срабатывал раньше времени
 
@@ -67,8 +67,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -KeepDownload
 | --- | --- |
 | [`install.ps1`](install.ps1) | Скачивание и установка prerelease в Windows и WSL2, проверка и откат |
 | [`scripts/install-helper.cjs`](scripts/install-helper.cjs) | Проверка файлов, правка JSONC-настроек Zed и транзакции установки |
-| [`.github/workflows/build-prerelease.yml`](.github/workflows/build-prerelease.yml) | Сборка Windows/Linux 0.160.0 и проверки расчёта контекста |
-| [`patches/codex-0.159.2-reasoning-accounting.patch`](patches/codex-0.159.2-reasoning-accounting.patch) | Патч для исходников Codex |
+| [`.github/workflows/build-prerelease.yml`](.github/workflows/build-prerelease.yml) | Сборка Windows/Linux 0.162.1 и проверки расчёта контекста |
+| [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch) | Патч для Codex 0.162.1 и текущей upstream-ветки `main` |
+| [`patches/codex-0.159.2-reasoning-accounting.patch`](patches/codex-0.159.2-reasoning-accounting.patch) | Патч для Codex 0.159.2 и 0.160.0 |
 | [`bootstrap/preload.cjs`](bootstrap/preload.cjs) | Переносимый загрузчик: направляет штатный агент `codex-acp` на установленный файл |
 | [`scripts/install.py`](scripts/install.py) | Установщик |
 | [`scripts/enable.ps1`](scripts/enable.ps1) | Включение исправления в Zed |
@@ -80,7 +81,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath -KeepDownload
 
 ## Сборка
 
-Автоматическая сборка 0.160.0 описана в workflow выше. Команды ниже относятся к исходной локальной сборке 0.159.2; один патч применяется к обеим версиям.
+Автоматическая сборка 0.162.1 описана в workflow выше; программы prerelease собраны локально скриптом [`scripts/build-local-wsl.sh`](scripts/build-local-wsl.sh). Команды ниже относятся к исходной локальной сборке 0.159.2; один патч применяется к обеим версиям.
 
 Клонируйте [OpenAI Codex](https://github.com/openai/codex) с тегом `rust-v0.159.2` и примените патч в корне его исходников:
 
@@ -91,7 +92,7 @@ git apply /path/to/codex-context-accounting-fix/patches/codex-0.159.2-reasoning-
 cd codex-rs
 ```
 
-Патч без изменений накладывается и на тег `rust-v0.160.0`. Для `rust-v0.162.1` и текущей upstream-ветки `main` используйте [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch): строку `recursion_limit` в `chatgpt/src/lib.rs` upstream уже добавил сам, поэтому этот файл больше не меняется. Готовых сборок 0.162.1 нет.
+Патч без изменений накладывается и на тег `rust-v0.160.0`. Для `rust-v0.162.1` и текущей upstream-ветки `main` используйте [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch): строку `recursion_limit` в `chatgpt/src/lib.rs` upstream уже добавил сам, поэтому этот файл больше не меняется.
 
 Используйте Rust 1.98.1, `just` и `cargo-nextest`. Для Windows также нужны цель `x86_64-pc-windows-msvc`, `cargo-xwin`, Clang/LLD и CMake. Первый запуск Cargo обновит локальные версии пакетов в `Cargo.lock` исходного тега; зависимости при этом остаются закреплёнными. Профиль, использованный для проверки:
 
@@ -202,6 +203,7 @@ Compact при этом запускается при 875 900 токенах (95
 - Те же 7 проверок проходят на `rust-v0.162.1` с его патчем (Linux, WSL2, отладочные тесты), а при отменённом исправлении четыре новых случая падают. На upstream `main` по состоянию на 2026-10-14 патч тоже накладывается.
 - На обеих версиях проходят 5 тестов модуля, которому потребовался увеличенный предел рекурсии компилятора.
 - Полный набор тестов всего исходного дерева не запускался.
+- Программы prerelease 0.162.1 собраны локально в WSL2: Windows через `cargo-xwin`, все 75 SQL-миграций в CRLF, Linux в окружении Ubuntu 22.04 (максимальное требование `GLIBC_2.35`). Архивы релиза прошли проверки app-server и штатного ACP в изолированных профилях Windows и WSL2 без запросов модели. В PowerShell 5.1 проверены установка, повторная установка, два отката, отказ при неверной контрольной сумме и автоматический откат после сбоя запуска в WSL. Две новые SQL-миграции только добавляют индекс и необязательный столбец, а 0.160.0 пропускает незнакомые ей миграции, поэтому откат на неё работает.
 - Программы prerelease 0.160.0 собраны в WSL2 и прошли проверки app-server и штатного ACP на Windows и WSL2, в том числе на существующих авторизованных профилях, без запросов модели. Установка и откат также проверены в изолированных профилях.
 - Замер рабочего чата относится к 0.159.2: после установки контекст дошёл до 922 856 входных токенов без преждевременного compact; до исправления тот же чат был сжат при 734 065.
 - Срабатывание compact на заданном пороге в рабочем чате ещё не наблюдалось.

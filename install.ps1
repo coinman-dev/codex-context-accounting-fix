@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-Install the patched Codex 0.160.0 for Windows and existing WSL2 Codex profiles.
+Install the patched Codex 0.162.1 for Windows and existing WSL2 Codex profiles.
 .EXAMPLE
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 .EXAMPLE
@@ -11,7 +11,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 #>
 [CmdletBinding()]
 param(
-    [ValidatePattern('^v0\.160\.0-reasoning\.1$')][string]$Release = 'v0.160.0-reasoning.1',
+    [ValidatePattern('^v0\.162\.1-reasoning\.1$')][string]$Release = 'v0.162.1-reasoning.1',
     [string[]]$Distro,
     [switch]$WindowsOnly,
     [switch]$WslOnly,
@@ -409,7 +409,7 @@ else {
     Move-Item -LiteralPath $manifestTemp -Destination (Join-Path $cache 'release.json') -Force
 }
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $cache 'release.json') | ConvertFrom-Json
-if ($manifest.schema -ne 1 -or $manifest.tag -ne $Release -or $manifest.upstream_version -ne '0.160.0') { throw 'Unexpected release manifest.' }
+if ($manifest.schema -ne 1 -or $manifest.tag -ne $Release -or $manifest.upstream_version -ne '0.162.1') { throw 'Unexpected release manifest.' }
 $cleanupTool = Get-Asset 'cleanup.cjs' $manifest $cache
 if ($Cleanup) {
     Invoke-ManagedCleanup $cleanupTool $targets (-not $WslOnly)
@@ -417,8 +417,8 @@ if ($Cleanup) {
 }
 $helper = Get-Asset 'install-helper.cjs' $manifest $cache
 Get-Asset 'preload.cjs' $manifest $cache | Out-Null
-$windowsArchive = 'codex-0.160.0-reasoning-windows-x64.zip'
-$linuxArchive = 'codex-0.160.0-reasoning-linux-x64.zip'
+$windowsArchive = 'codex-0.162.1-reasoning-windows-x64.zip'
+$linuxArchive = 'codex-0.162.1-reasoning-linux-x64.zip'
 if (-not $WslOnly) { $archive = Get-Asset $windowsArchive $manifest $cache }
 if ($targets.Count) { Get-Asset $linuxArchive $manifest $cache | Out-Null }
 $preparedWindows = $false

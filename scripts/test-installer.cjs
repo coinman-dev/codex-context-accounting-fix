@@ -35,8 +35,8 @@ test('Real CLI: activation, rerun, edited-settings protection, and rollback rest
   const windows = process.platform === 'win32';
   const platform = windows ? 'windows' : 'linux';
   const vendorTarget = windows ? 'x86_64-pc-windows-msvc' : 'x86_64-unknown-linux-musl';
-  const vendor = path.join(project, `build/vendor-0.160.0-${platform}/package/vendor/${vendorTarget}`);
-  assert.ok(fs.existsSync(vendor), 'Fetch the official 0.160.0 vendor fixture before this test');
+  const vendor = path.join(project, `build/vendor-0.162.1-${platform}/package/vendor/${vendorTarget}`);
+  assert.ok(fs.existsSync(vendor), 'Fetch the official 0.162.1 vendor fixture before this test');
   const fixture = path.join(process.env.CODEX_INSTALLER_TEST_ROOT || path.join(project, 'build'), 'installer-test-' + crypto.randomUUID());
   const home = path.join(fixture, 'home'), packageDir = path.join(fixture, 'package');
   fs.mkdirSync(home, {recursive: true});
@@ -48,9 +48,9 @@ test('Real CLI: activation, rerun, edited-settings protection, and rollback rest
     }
   }
   copyTree(vendor, packageDir);
-  fs.writeFileSync(path.join(packageDir, 'source.patch'), fs.readFileSync(path.join(project, 'patches/codex-0.159.2-reasoning-accounting.patch')));
+  fs.writeFileSync(path.join(packageDir, 'source.patch'), fs.readFileSync(path.join(project, 'patches/codex-0.162.1-reasoning-accounting.patch')));
   const binaryName = windows ? 'bin/codex.exe' : 'bin/codex';
-  const manifest = {version: '0.160.0-reasoning.1', upstream_version: '0.160.0', upstream_commit: 'a956835d020762cb2b570053af06f643a11c0ecc',
+  const manifest = {version: '0.162.1-reasoning.1', upstream_version: '0.162.1', upstream_commit: '092d3acd6bec3e3a14bdc7e7a2810ab628ab759d',
     platform, executable: binaryName, binary_sha256: digest(path.join(packageDir, binaryName)), patch_sha256: digest(path.join(packageDir, 'source.patch')), files: {}};
   function files(dir) {
     for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
@@ -91,7 +91,7 @@ test('Real CLI: activation, rerun, edited-settings protection, and rollback rest
   const cli = windows ? spawnSync('cmd.exe', ['/d', '/s', '/c', '""' + shim + '" --version"'], {env, encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true}) :
     spawnSync(shim, ['--version'], {env, encoding: 'utf8'});
   assert.equal(cli.status, 0, cli.stderr);
-  assert.equal(cli.stdout.trim(), 'codex-cli 0.160.0');
+  assert.equal(cli.stdout.trim(), 'codex-cli 0.162.1');
   assert.equal(run({operation: 'commit', transactionId: id}).alreadyInstalled, true);
   // A second transaction must not duplicate settings/PATH entries.
   const second = crypto.randomUUID(); prepare(second);

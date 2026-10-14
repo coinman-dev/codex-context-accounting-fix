@@ -9,7 +9,7 @@ const base = path.resolve(__dirname, '../build');
 function fixture() {
   const folder = path.join(base, 'cleanup-test-' + crypto.randomUUID()), root = path.join(folder, 'fix');
   fs.mkdirSync(root, {recursive: true});
-  const version = '0.160.0-reasoning.1';
+  const version = '0.162.1-reasoning.1';
   const release = name => {
     const dir = path.join(root, name); fs.mkdirSync(path.join(dir, 'bin'), {recursive: true});
     fs.writeFileSync(path.join(dir, 'bin/codex'), 'binary');
@@ -19,9 +19,9 @@ function fixture() {
   release(version);
   const manifest = {version, executable: version + '/bin/codex', binary_sha256: crypto.createHash('sha256').update('binary').digest('hex')};
   fs.writeFileSync(path.join(root, 'current.json'), JSON.stringify(manifest));
-  const downloads = path.join(root, 'downloads'); fs.mkdirSync(path.join(downloads, 'v0.160.0-reasoning.1/package'), {recursive: true});
-  fs.writeFileSync(path.join(downloads, 'v0.160.0-reasoning.1/a.zip'), 'archive');
-  fs.writeFileSync(path.join(downloads, 'v0.160.0-reasoning.1/package/copy'), 'copy');
+  const downloads = path.join(root, 'downloads'); fs.mkdirSync(path.join(downloads, 'v0.162.1-reasoning.1/package'), {recursive: true});
+  fs.writeFileSync(path.join(downloads, 'v0.162.1-reasoning.1/a.zip'), 'archive');
+  fs.writeFileSync(path.join(downloads, 'v0.162.1-reasoning.1/package/copy'), 'copy');
   return {folder, root, version, release, downloads};
 }
 test('Cleanup removes scratch and unused managed releases, preserving active release, rollback and user files', () => {
@@ -45,8 +45,8 @@ test('Cleanup removes scratch and unused managed releases, preserving active rel
 });
 test('KeepDownloads keeps archives but removes expanded copies', () => {
   const f = fixture(); cleanup(f.root, {keepDownloads:true});
-  assert.ok(fs.existsSync(path.join(f.downloads,'v0.160.0-reasoning.1/a.zip')));
-  assert.ok(!fs.existsSync(path.join(f.downloads,'v0.160.0-reasoning.1/package')));
+  assert.ok(fs.existsSync(path.join(f.downloads,'v0.162.1-reasoning.1/a.zip')));
+  assert.ok(!fs.existsSync(path.join(f.downloads,'v0.162.1-reasoning.1/package')));
 });
 test('A changed binary or a pending installation refuses cleanup without deleting scratch', () => {
   const f = fixture(); fs.appendFileSync(path.join(f.root,f.version,'bin/codex'),'changed');

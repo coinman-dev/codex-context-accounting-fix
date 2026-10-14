@@ -29,16 +29,16 @@ def main():
     assets = test / 'assets'
     assets.mkdir(parents=True)
     home.mkdir()
-    vendor = ROOT / 'build/vendor-0.160.0-windows/package/vendor/x86_64-pc-windows-msvc'
+    vendor = ROOT / 'build/vendor-0.162.1-windows/package/vendor/x86_64-pc-windows-msvc'
     shutil.copytree(vendor, package)
-    shutil.copy2(ROOT / 'patches/codex-0.159.2-reasoning-accounting.patch', package / 'source.patch')
-    manifest = {'version': '0.160.0-reasoning.1', 'upstream_version': '0.160.0',
-                'upstream_commit': 'a956835d020762cb2b570053af06f643a11c0ecc', 'platform': 'windows',
+    shutil.copy2(ROOT / 'patches/codex-0.162.1-reasoning-accounting.patch', package / 'source.patch')
+    manifest = {'version': '0.162.1-reasoning.1', 'upstream_version': '0.162.1',
+                'upstream_commit': '092d3acd6bec3e3a14bdc7e7a2810ab628ab759d', 'platform': 'windows',
                 'executable': 'bin/codex.exe', 'binary_sha256': sha(package / 'bin/codex.exe'),
                 'patch_sha256': sha(package / 'source.patch'),
                 'files': {p.relative_to(package).as_posix(): sha(p) for p in package.rglob('*') if p.is_file()}}
     (package / 'release-manifest.json').write_text(json.dumps(manifest))
-    archive = assets / 'codex-0.160.0-reasoning-windows-x64.zip'
+    archive = assets / 'codex-0.162.1-reasoning-windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
         for file in package.rglob('*'):
             if file.is_file():
@@ -50,14 +50,14 @@ def main():
     flags = ['-WindowsOnly']
     if args.wsl_distro:
         linux = test / 'package-linux'
-        linux_vendor = ROOT / 'build/vendor-0.160.0-linux/package/vendor/x86_64-unknown-linux-musl'
+        linux_vendor = ROOT / 'build/vendor-0.162.1-linux/package/vendor/x86_64-unknown-linux-musl'
         shutil.copytree(linux_vendor, linux)
         shutil.copy2(package / 'source.patch', linux / 'source.patch')
         linux_manifest = {**manifest, 'platform': 'linux', 'executable': 'bin/codex',
                           'binary_sha256': sha(linux / 'bin/codex'),
                           'files': {p.relative_to(linux).as_posix(): sha(p) for p in linux.rglob('*') if p.is_file()}}
         (linux / 'release-manifest.json').write_text(json.dumps(linux_manifest))
-        with zipfile.ZipFile(assets / 'codex-0.160.0-reasoning-linux-x64.zip', 'w', zipfile.ZIP_DEFLATED) as output:
+        with zipfile.ZipFile(assets / 'codex-0.162.1-reasoning-linux-x64.zip', 'w', zipfile.ZIP_DEFLATED) as output:
             for file in linux.rglob('*'):
                 if file.is_file():
                     output.write(file, file.relative_to(linux).as_posix())
@@ -70,7 +70,7 @@ def main():
         script = test / 'install-test.ps1'
         script.write_text((ROOT / 'install.ps1').read_text().replace('function Invoke-WslAction', injected + 'function Invoke-WslAction'), encoding='utf-8')
         flags = ['-Distro', args.wsl_distro]
-    metadata = {'schema': 1, 'tag': 'v0.160.0-reasoning.1', 'upstream_version': '0.160.0',
+    metadata = {'schema': 1, 'tag': 'v0.162.1-reasoning.1', 'upstream_version': '0.162.1',
                 'assets': {p.name: {'sha256': sha(p)} for p in assets.iterdir()}}
     (assets / 'release.json').write_text(json.dumps(metadata))
     env = {**os.environ, 'HOME': str(home), 'USERPROFILE': str(home), 'CODEX_HOME': str(home / '.codex'),
@@ -92,7 +92,7 @@ def main():
     run(*flags, '-SkipCli', '-AssetDirectory', str(assets))
     current = home / '.codex/context-accounting-fix/current.json'
     installed = current.read_bytes()
-    assert json.loads(installed)['version'] == '0.160.0-reasoning.1'
+    assert json.loads(installed)['version'] == '0.162.1-reasoning.1'
     assert not (current.parent / 'downloads').exists(), 'Successful installation must remove scratch downloads'
     assert (assets / archive.name).exists(), 'Offline source archives must remain intact'
     with (current.parent / 'installer.lock').open('rb'):

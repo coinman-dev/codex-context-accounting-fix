@@ -6,8 +6,8 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const {spawn, spawnSync} = require('node:child_process');
 const WINDOWS = process.platform === 'win32';
-const VERSION = '0.160.0-reasoning.1';
-const UPSTREAM = 'a956835d020762cb2b570053af06f643a11c0ecc';
+const VERSION = '0.162.1-reasoning.1';
+const UPSTREAM = '092d3acd6bec3e3a14bdc7e7a2810ab628ab759d';
 const marker = '#codex-context-accounting-fix';
 const bootstrap = 'import{homedir}from"node:os";import{join}from"node:path";import{pathToFileURL}from"node:url";await import(pathToFileURL(join(homedir(),".codex","context-accounting-fix","preload.cjs")).href);';
 const option = '--import=data:text/javascript,' + encodeURIComponent(bootstrap) + marker;
@@ -114,7 +114,7 @@ function zedSettings(original) {
 
 function verifyPackage(directory) {
   const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'release-manifest.json'), 'utf8'));
-  if (manifest.version !== VERSION || manifest.upstream_version !== '0.160.0' || manifest.upstream_commit !== UPSTREAM ||
+  if (manifest.version !== VERSION || manifest.upstream_version !== '0.162.1' || manifest.upstream_commit !== UPSTREAM ||
       manifest.platform !== (WINDOWS ? 'windows' : 'linux') || manifest.executable !== ('bin/' + (WINDOWS ? 'codex.exe' : 'codex'))) {
     throw new Error('Release manifest does not match this installer/platform');
   }
@@ -153,7 +153,7 @@ function prepare(request) {
   }
   const binary = inside(release, manifest.executable);
   const version = spawnSync(binary, ['--version'], {encoding: 'utf8', timeout: 20000, windowsHide: true});
-  if (version.status !== 0 || version.stdout.trim() !== 'codex-cli 0.160.0') throw new Error('CLI startup failed: ' + version.stderr);
+  if (version.status !== 0 || version.stdout.trim() !== 'codex-cli 0.162.1') throw new Error('CLI startup failed: ' + version.stderr);
   const transactionDir = inside(root, 'transactions/' + request.transactionId);
   if (fs.existsSync(transactionDir)) throw new Error('Transaction already exists');
   fs.mkdirSync(transactionDir, {recursive: true});

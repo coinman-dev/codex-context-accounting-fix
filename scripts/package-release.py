@@ -8,9 +8,9 @@ import subprocess
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.160.0'
-COMMIT = 'a956835d020762cb2b570053af06f643a11c0ecc'
-TAG = 'v0.160.0-reasoning.1'
+VERSION = '0.162.1'
+COMMIT = '092d3acd6bec3e3a14bdc7e7a2810ab628ab759d'
+TAG = 'v0.162.1-reasoning.1'
 
 
 def sha(path):
@@ -45,7 +45,7 @@ def main():
         raise ValueError('Unexpected CLI version')
     package['target'] = target
     (stage / 'codex-package.json').write_text(json.dumps(package, indent=2) + '\n')
-    patch = ROOT / 'patches/codex-0.159.2-reasoning-accounting.patch'
+    patch = ROOT / 'patches/codex-0.162.1-reasoning-accounting.patch'
     shutil.copy2(patch, stage / 'source.patch')
     shutil.copy2(ROOT / 'LICENSE', stage / 'LICENSE')
     manifest = {'version': TAG.removeprefix('v'), 'upstream_version': VERSION,
@@ -59,7 +59,7 @@ def main():
         for path in sorted(stage.rglob('*')):
             if path.is_file():
                 output.write(path, path.relative_to(stage).as_posix())
-    (dist / (archive.name + '.sha256')).write_text(f'{sha(archive)}  {archive.name}\n')
+    (dist / (archive.name + '.sha256')).write_text(f'{sha(archive)}  {archive.name}\n', newline='\n')
     print(archive)
 
 

@@ -2,21 +2,21 @@
 
 # Codex context accounting fix
 
-[![Codex 0.160.0](https://img.shields.io/badge/Codex-0.160.0-10A37F.svg)](#automatic-installation-windows-and-wsl2)
+[![Codex 0.162.1](https://img.shields.io/badge/Codex-0.162.1-10A37F.svg)](#automatic-installation-windows-and-wsl2)
 [![Windows | Ubuntu/WSL2](https://img.shields.io/badge/Windows%20%7C%20Ubuntu%2FWSL2-x64-0078D4.svg)](#installation)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-**codex-context-accounting-fix** fixes premature compaction in **Codex 0.159.2 and 0.160.0** on Windows and Ubuntu/WSL2. The **0.160.0 prerelease** provides rebuilt binaries and a PowerShell installer for Zed and the terminal. The fix prevents stored reasoning from being counted twice.
+**codex-context-accounting-fix** fixes premature compaction in **Codex 0.159.2, 0.160.0 and 0.162.1** on Windows and Ubuntu/WSL2. The **0.162.1 prerelease** provides rebuilt binaries and a PowerShell installer for Zed and the terminal. The fix prevents stored reasoning from being counted twice.
 
 Only reproducible sources are committed here. Binaries are distributed through GitHub Releases; model catalogs, logs and account data are not published.
 
 ## Automatic installation: Windows and WSL2
 
-Download and run the installer from [v0.160.0-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.160.0-reasoning.1):
+Download and run the installer from [v0.162.1-reasoning.1](https://github.com/coinman-dev/codex-context-accounting-fix/releases/tag/v0.162.1-reasoning.1):
 
 ```powershell
 $installerPath = Join-Path $env:USERPROFILE 'install-codex-fix.ps1'
-Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.160.0-reasoning.1/install.ps1 -OutFile $installerPath
+Invoke-WebRequest -UseBasicParsing https://github.com/coinman-dev/codex-context-accounting-fix/releases/download/v0.162.1-reasoning.1/install.ps1 -OutFile $installerPath
 powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath
 ```
 
@@ -49,7 +49,7 @@ Rollback restores the previous files, including an earlier local fix. It stops i
 
 Offline installation also requires `cleanup.cjs`. The `-Cleanup` mode clears an existing installation without reinstalling binaries. Installer and cleanup runs are serialized; cleanup refuses pending installations, changed binaries, and symlinks/junctions in deletion candidates. A later reinstall can download archives again after automatic cleanup.
 
-The archives include the platform resources from the official 0.160.0 npm packages, verified against npm SHA-512, plus the patched CLI and its source patch. Windows SQL migrations are normalized to CRLF to match the official Windows database checksums. Both prerelease binaries were built locally in WSL2: Windows through `cargo-xwin`, Linux inside an Ubuntu 22.04 build environment. The Linux binary's highest glibc requirement is `GLIBC_2.35`. The build scripts pin upstream commit `a956835d020762cb2b570053af06f643a11c0ecc` and verify upstream V8 assets against the checked-in manifests.
+The archives include the platform resources from the official 0.162.1 npm packages, verified against npm SHA-512, plus the patched CLI and its source patch. Windows SQL migrations are normalized to CRLF to match the official Windows database checksums. Both prerelease binaries were built locally in WSL2: Windows through `cargo-xwin`, Linux inside an Ubuntu 22.04 build environment. The Linux binary's highest glibc requirement is `GLIBC_2.35`. The build scripts pin upstream commit `092d3acd6bec3e3a14bdc7e7a2810ab628ab759d` and verify upstream V8 assets against the checked-in manifests.
 
 ## Why compact started too early
 
@@ -67,8 +67,9 @@ The patch decides how reasoning is counted from the request mode, keeps the prev
 | --- | --- |
 | [`install.ps1`](install.ps1) | Downloads and installs prerelease binaries on Windows and WSL2; supports checks and rollback |
 | [`scripts/install-helper.cjs`](scripts/install-helper.cjs) | Verifies packages, edits Zed JSONC, and performs installation transactions |
-| [`.github/workflows/build-prerelease.yml`](.github/workflows/build-prerelease.yml) | Builds Windows/Linux 0.160.0 and runs accounting regression tests |
-| [`patches/codex-0.159.2-reasoning-accounting.patch`](patches/codex-0.159.2-reasoning-accounting.patch) | The patch for the Codex sources |
+| [`.github/workflows/build-prerelease.yml`](.github/workflows/build-prerelease.yml) | Builds Windows/Linux 0.162.1 and runs accounting regression tests |
+| [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch) | The patch for Codex 0.162.1 and current upstream `main` |
+| [`patches/codex-0.159.2-reasoning-accounting.patch`](patches/codex-0.159.2-reasoning-accounting.patch) | The patch for Codex 0.159.2 and 0.160.0 |
 | [`bootstrap/preload.cjs`](bootstrap/preload.cjs) | Portable loader that points the stock `codex-acp` agent at the installed binary |
 | [`scripts/install.py`](scripts/install.py) | Installer |
 | [`scripts/enable.ps1`](scripts/enable.ps1) | Enables the fix in Zed |
@@ -80,7 +81,7 @@ The patch decides how reasoning is counted from the request mode, keeps the prev
 
 ## Building
 
-The automated 0.160.0 build is in the workflow above. The following commands describe the original local 0.159.2 build; the same patch applies to both versions.
+The automated 0.162.1 build is in the workflow above; the prerelease binaries were built locally with [`scripts/build-local-wsl.sh`](scripts/build-local-wsl.sh). The following commands describe the original local 0.159.2 build; the same patch applies to both versions.
 
 Clone [OpenAI Codex](https://github.com/openai/codex) at tag `rust-v0.159.2` and apply the patch in the root of its sources:
 
@@ -91,7 +92,7 @@ git apply /path/to/codex-context-accounting-fix/patches/codex-0.159.2-reasoning-
 cd codex-rs
 ```
 
-The patch also applies unchanged to tag `rust-v0.160.0`. For `rust-v0.162.1` and current upstream `main` use [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch): upstream already added the `recursion_limit` line in `chatgpt/src/lib.rs`, so that file is no longer patched. No 0.162.1 binaries are published.
+The patch also applies unchanged to tag `rust-v0.160.0`. For `rust-v0.162.1` and current upstream `main` use [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch): upstream already added the `recursion_limit` line in `chatgpt/src/lib.rs`, so that file is no longer patched.
 
 Use Rust 1.98.1, `just` and `cargo-nextest`. A Windows build also needs the `x86_64-pc-windows-msvc` target, `cargo-xwin`, Clang/LLD and CMake. The first Cargo run updates the local package versions in the `Cargo.lock` of the source tag; the dependencies stay pinned. The profile used for validation:
 
@@ -202,6 +203,7 @@ The client checks the threshold between model steps, and one step adds reasoning
 - The same 7 checks pass on `rust-v0.162.1` with its patch (Linux, WSL2, debug tests), and the four new cases fail when the fix is reverted. The patch also applies to upstream `main` as of 2026-10-14.
 - 5 tests pass on both versions in the module that needed a raised compiler recursion limit.
 - The full test suite of the source tree was not run.
+- The 0.162.1 prerelease binaries were built locally in WSL2: Windows through `cargo-xwin` with all 75 SQL migrations in CRLF, Linux inside Ubuntu 22.04 (highest requirement `GLIBC_2.35`). The release archives passed app-server and stock ACP startup checks in isolated Windows and WSL2 profiles without inference requests. Installation, repeated installation, two rollbacks, checksum rejection and automatic rollback after a WSL startup failure passed under PowerShell 5.1. The two new SQL migrations only add an index and a nullable column, and 0.160.0 ignores migrations it does not know, so a rollback to it keeps working.
 - The 0.160.0 prerelease binaries were built in WSL2 and passed app-server and stock ACP startup checks on Windows and WSL2, including the existing signed-in profiles, without inference requests. The installer and rollback were also checked in isolated profiles.
 - The live-chat measurement remains from 0.159.2: after installation the context reached 922,856 input tokens without premature compact; before the fix the same chat was compacted at 734,065.
 - Compact at the configured threshold has not yet been observed in a working chat.
