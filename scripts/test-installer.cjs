@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {spawnSync} = require('node:child_process');
-const {jsonc, zedSettings, option} = require('./install-helper.cjs');
+const {jsonc, zedSettings, option, protocolProbe} = require('./install-helper.cjs');
 const project = path.resolve(__dirname, '..');
 const digest = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
@@ -115,4 +115,23 @@ test('Real CLI: activation, rerun, edited-settings protection, and rollback rest
   // Corrupt a file, then ensure preparation fails before activation.
   fs.appendFileSync(path.join(packageDir, 'source.patch'), 'tampered');
   assert.match(run({operation: 'prepare', transactionId: crypto.randomUUID(), packageDir, assetsDir: assets}, false), /checksum mismatch/);
+});
+
+test('A startup probe finishes even when a grandchild keeps its pipes open', {timeout: 60000}, async () => {
+  const cwd = path.join(project, 'build', 'probe-test-' + crypto.randomUUID());
+  fs.mkdirSync(cwd, {recursive: true});
+  // process.execPath runs ./app-server: answer the probe, then leave a child holding the inherited pipes.
+  fs.writeFileSync(path.join(cwd, 'app-server'), `
+    const {spawn} = require('node:child_process');
+    spawn(process.execPath, ['-e', 'setTimeout(() => {}, 40000)'], {stdio: 'inherit'});
+    require('node:readline').createInterface({input: process.stdin}).on('line', line => {
+      const message = JSON.parse(line);
+      if (message.id) console.log(JSON.stringify({id: message.id, result: {}}));
+    });
+    setInterval(() => {}, 1000);
+  `);
+  const started = Date.now();
+  assert.equal(await protocolProbe(process.execPath, null, cwd), 'passed');
+  assert.ok(Date.now() - started < 20000, 'The probe waited for the grandchild instead of the probed process');
+  fs.rmSync(cwd, {recursive: true, force: true});
 });

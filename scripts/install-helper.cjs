@@ -238,21 +238,33 @@ async function protocolProbe(binary, adapter, cwd) {
     if (adapter) { env.NODE_OPTIONS = option; env.CODEX_CONTEXT_FIX_TRACE = '1'; }
     else delete env.NODE_OPTIONS;
     const child = spawn(adapter ? process.execPath : binary, adapter ? [adapter] : ['app-server'], {cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe']});
+    const label = adapter ? 'ACP' : 'app-server';
+    const note = text => console.error(new Date().toISOString() + ' ' + label + ' startup probe ' + text);
+    note('started');
     let stderr = '', pending = '', selected = !adapter, settled = false;
     function finish(error, status = 'passed') {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      const done = () => { if (error) reject(error); else resolve(status); };
+      note(error ? 'failed' : status);
+      const done = () => { note('process stopped'); if (error) reject(error); else resolve(status); };
       // The next probe opens the same SQLite profile. Wait for the previous
       // process to exit and release its handles before starting the adapter.
       if (child.pid && child.exitCode === null && child.signalCode === null) {
-        child.once('close', done);
+        // Wait for the process, not its pipes: a grandchild that inherited
+        // them could keep 'close' from ever firing.
+        const limit = setTimeout(() => {
+          child.stdout.destroy(); child.stderr.destroy();
+          reject(new Error(label + ' startup probe process did not exit after it was stopped' + (error ? ': ' + error.message : '')));
+        }, 15000);
+        child.once('exit', () => { clearTimeout(limit); child.stdout.destroy(); child.stderr.destroy(); done(); });
         child.stdin.end();
-        child.kill();
+        // Killing only the adapter on Windows would leave its codex.exe running with the profile open.
+        if (WINDOWS) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {windowsHide: true, timeout: 15000});
+        else child.kill();
       } else done();
     }
-    const timer = setTimeout(() => finish(new Error('Startup probe timed out: ' + stderr)), 30000);
+    const timer = setTimeout(() => finish(new Error(label + ' startup probe timed out after 30 s: ' + stderr)), 30000);
     child.on('error', finish);
     child.stdin.on('error', finish);
     child.on('close', code => { if (!settled) finish(new Error('Startup process exited (' + code + '): ' + stderr)); });
@@ -351,5 +363,7 @@ async function main() {
   else throw new Error('Unknown installer operation');
   console.log(JSON.stringify(result));
 }
-if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = {jsonc, zedSettings, verifyPackage, option};
+// Exit explicitly once output is flushed, so a leftover handle cannot keep the installer waiting.
+if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; })
+  .finally(() => process.stdout.write('', () => process.stderr.write('', () => process.exit())));
+module.exports = {jsonc, zedSettings, verifyPackage, option, protocolProbe};

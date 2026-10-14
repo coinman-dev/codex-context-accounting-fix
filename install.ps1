@@ -89,7 +89,14 @@ function Invoke-Captured([string]$Executable, [string[]]$Arguments, [string]$Inp
         if (-not $process.HasExited) { $process.Kill() }
         throw
     } finally { $inputStream.Dispose() }
-    if (-not $process.WaitForExit(180000)) { $process.Kill(); throw "Process timed out: $Executable" }
+    if (-not $process.WaitForExit(180000)) {
+        # Stop the whole tree, so no Codex process keeps the profile open during rollback.
+        & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null
+        if (-not $process.HasExited) { $process.Kill() }
+        $partial = if ($stderr.Wait(5000)) { $stderr.Result } else { '' }
+        if ($partial.Length -gt 4000) { $partial = $partial.Substring($partial.Length - 4000) }
+        throw "Process timed out: $Executable $($info.Arguments)`n$partial"
+    }
     $output = $stdout.GetAwaiter().GetResult()
     $errors = $stderr.GetAwaiter().GetResult()
     if ($process.ExitCode -ne 0) { throw "$Executable failed ($($process.ExitCode)): $errors$output" }
