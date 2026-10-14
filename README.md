@@ -91,7 +91,7 @@ git apply /path/to/codex-context-accounting-fix/patches/codex-0.159.2-reasoning-
 cd codex-rs
 ```
 
-The patch also applies unchanged to tag `rust-v0.160.0`.
+The patch also applies unchanged to tag `rust-v0.160.0`. For `rust-v0.162.1` and current upstream `main` use [`patches/codex-0.162.1-reasoning-accounting.patch`](patches/codex-0.162.1-reasoning-accounting.patch): upstream already added the `recursion_limit` line in `chatgpt/src/lib.rs`, so that file is no longer patched. No 0.162.1 binaries are published.
 
 Use Rust 1.98.1, `just` and `cargo-nextest`. A Windows build also needs the `x86_64-pc-windows-msvc` target, `cargo-xwin`, Clang/LLD and CMake. The first Cargo run updates the local package versions in the `Cargo.lock` of the source tag; the dependencies stay pinned. The profile used for validation:
 
@@ -199,6 +199,7 @@ The client checks the threshold between model steps, and one step adds reasoning
 
 - 7 integration checks of the context calculation pass on 0.159.2 and on 0.160.0, including session restore and both threshold modes.
 - On unpatched 0.160.0 sources the four new cases fail: Codex sends the compact request that the patch prevents.
+- The same 7 checks pass on `rust-v0.162.1` with its patch (Linux, WSL2, debug tests), and the four new cases fail when the fix is reverted. The patch also applies to upstream `main` as of 2026-10-14.
 - 5 tests pass on both versions in the module that needed a raised compiler recursion limit.
 - The full test suite of the source tree was not run.
 - The 0.160.0 prerelease binaries were built in WSL2 and passed app-server and stock ACP startup checks on Windows and WSL2, including the existing signed-in profiles, without inference requests. The installer and rollback were also checked in isolated profiles.
